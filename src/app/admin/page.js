@@ -120,18 +120,21 @@ export default function AdminPanel() {
   }, [router]);
 
  // -- REALTIME ENGINE (PRODUCTION MODE) --
+ // -- REALTIME ENGINE (PRODUCTION MODE) --
   useEffect(() => {
     if (!cafeId) return;
 
+    // Use a fresh channel name to bypass any cached WebSocket connections
     const channel = supabase
-      .channel('schema-db-changes') 
+      .channel('cafe-telemetry') 
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'ServiceRequest',
-          filter: `"cafeId"=eq.${cafeId}`, // RESTORED: Admin only hears their own cafe's pings
+          // THE FIX: Removed the double quotes! Just the exact column name.
+          filter: `cafeId=eq.${cafeId}`, 
         },
         (payload) => {
           try {
