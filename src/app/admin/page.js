@@ -119,35 +119,29 @@ export default function AdminPanel() {
     checkAuthAndLoadData();
   }, [router]);
 
-  // -- MISSING REALTIME ENGINE --
-// -- REALTIME DEBUGGING ENGINE --
+ // -- REALTIME ENGINE (PRODUCTION MODE) --
   useEffect(() => {
     if (!cafeId) return;
 
-    console.log("🟢 1. Setting up Realtime...");
-
     const channel = supabase
-      .channel('any-db-changes') // Changed channel name just in case it was cached
+      .channel('schema-db-changes') 
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'ServiceRequest',
-          // ⚠️ FILTER IS COMPLETELY REMOVED FOR THIS TEST
+          filter: `"cafeId"=eq.${cafeId}`, // RESTORED: Admin only hears their own cafe's pings
         },
         (payload) => {
-          console.log("🚨 3. PING RECEIVED!", payload);
           try {
             const audio = new Audio('/bell.mp3');
-            audio.play().catch(e => console.log("Audio blocked"));
+            audio.play().catch(e => console.log("Audio blocked by browser policy"));
           } catch(e){}
           setLiveRequests((current) => [payload.new, ...current]);
         }
       )
-      .subscribe((status) => {
-        console.log("🔵 2. Realtime Status:", status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -1041,6 +1035,51 @@ export default function AdminPanel() {
             ))}
           </AnimatePresence>
         </div>
+        {/* --- CATEGORY MODAL --- */}
+        <AnimatePresence>
+          {showCategoryModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6"
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="bg-white rounded-[32px] p-6 w-full max-w-[340px] shadow-2xl relative"
+              >
+                <h3 className="text-lg font-bold text-[#111814] mb-4">New Category</h3>
+                <div className="mb-6">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Category Name</label>
+                  <input
+                    type="text"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="e.g., Hot Beverages"
+                    className="w-full pb-2 border-b border-neutral-200 text-[15px] font-medium text-black focus:outline-none focus:border-black rounded-none bg-transparent"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowCategoryModal(false)} 
+                    className="flex-1 py-3.5 rounded-xl font-bold text-[12px] tracking-wider text-neutral-500 hover:bg-neutral-50 transition-colors"
+                  >
+                    CANCEL
+                  </button>
+                  <button 
+                    onClick={handleAddCategory} 
+                    className="flex-1 py-3.5 rounded-xl font-bold text-[12px] tracking-wider text-white bg-[#111814] shadow-[0_4px_14px_rgba(0,0,0,0.25)] hover:scale-[1.02] transition-transform"
+                  >
+                    SAVE
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );

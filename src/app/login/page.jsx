@@ -62,7 +62,7 @@ export default function LoginPage() {
               type="email" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@chillchai.com" 
+              placeholder="admin@cafename.com" 
               className="w-full pb-2 border-b border-neutral-300 text-[15px] font-medium text-black focus:outline-none focus:border-black rounded-none bg-transparent transition-colors"
               required
             />
