@@ -16,13 +16,27 @@ import {
   uploadImage,
   updateMenuItem,
   updateCafeSettings,
-  // --- NEW PREMIUM IMPORTS ---
   getBanners,
   addBanner,
   deleteBanner,
   toggleCategoryHighlight,
-  resolveServiceRequest
+  resolveServiceRequest,
+  savePushSubscription,
 } from "../actions/adminActions";
+
+// Helper to decode the VAPID key for the browser
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, "+")
+    .replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 const ToggleSwitch = ({ isOn, onToggle }) => (
   <div
@@ -72,6 +86,8 @@ export default function AdminPanel() {
     imageUrl: DEFAULT_IMAGE,
   });
 
+  const [isSaving, setIsSaving] = useState(false);
+
   // -- REALTIME NOTIFICATIONS STATE --
   const [liveRequests, setLiveRequests] = useState([]);
 
@@ -119,30 +135,31 @@ export default function AdminPanel() {
     checkAuthAndLoadData();
   }, [router]);
 
- // -- REALTIME ENGINE (PRODUCTION MODE) --
- // -- REALTIME ENGINE (PRODUCTION MODE) --
+  // -- REALTIME ENGINE (PRODUCTION MODE) --
   useEffect(() => {
     if (!cafeId) return;
 
     // Use a fresh channel name to bypass any cached WebSocket connections
     const channel = supabase
-      .channel('cafe-telemetry') 
+      .channel("cafe-telemetry")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'ServiceRequest',
+          event: "INSERT",
+          schema: "public",
+          table: "ServiceRequest",
           // THE FIX: Removed the double quotes! Just the exact column name.
-          filter: `cafeId=eq.${cafeId}`, 
+          filter: `cafeId=eq.${cafeId}`,
         },
         (payload) => {
           try {
-            const audio = new Audio('/bell.mp3');
-            audio.play().catch(e => console.log("Audio blocked by browser policy"));
-          } catch(e){}
+            const audio = new Audio("/bell.mp3");
+            audio
+              .play()
+              .catch((e) => console.log("Audio blocked by browser policy"));
+          } catch (e) {}
           setLiveRequests((current) => [payload.new, ...current]);
-        }
+        },
       )
       .subscribe();
 
@@ -153,7 +170,7 @@ export default function AdminPanel() {
 
   const handleResolveRequest = async (id) => {
     // Optimistically remove it from UI
-    setLiveRequests((current) => current.filter(req => req.id !== id));
+    setLiveRequests((current) => current.filter((req) => req.id !== id));
     try {
       await resolveServiceRequest(id);
     } catch (error) {
@@ -189,7 +206,48 @@ export default function AdminPanel() {
       alert("Failed to update settings.");
     }
   };
+  const handleEnablePushNotifications = async () => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      alert("Push notifications are not supported by your current browser.");
+      return;
+    }
 
+    try {
+      // 1. Ask the user for permission
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        alert(
+          "You must allow notifications in your browser settings to use this feature.",
+        );
+        return;
+      }
+
+      // 2. Register the background listener
+      await navigator.serviceWorker.register("/sw.js");
+
+      // THE FIX: Wait for the browser to confirm the Service Worker is fully ACTIVE
+      const registration = await navigator.serviceWorker.ready;
+
+      const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!publicVapidKey)
+        throw new Error("Missing VAPID Key in environment variables.");
+
+      // 3. Get the subscription token from Apple/Google
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicVapidKey),
+      });
+      const plainSubscription = subscription.toJSON();
+      // 4. Save it to our Supabase database
+      await savePushSubscription(cafeId, plainSubscription);
+      alert(
+        "✅ Background Notifications Enabled! You will now be alerted even if the app is closed.",
+      );
+    } catch (error) {
+      console.error("Failed to enable push:", error);
+      alert("Error enabling notifications: " + error.message);
+    }
+  };
   const handleToggleHighlight = async (category) => {
     if (!enforcePremium()) return; // Block Standard Users
     const newState = !category.isHighlighted;
@@ -212,11 +270,20 @@ export default function AdminPanel() {
 
   const handleBannerUpload = async (e) => {
     if (!enforcePremium()) {
-      e.target.value = null; // Clear the input
+      e.target.value = null;
       return;
     }
+
     const file = e.target.files[0];
     if (!file || !cafeId) return;
+
+    if (file.size > 800000) {
+      alert(
+        "This image is too large! Please upload an image smaller than 800KB.",
+      );
+      e.target.value = null;
+      return;
+    }
 
     setIsUploadingBanner(true);
     try {
@@ -258,14 +325,20 @@ export default function AdminPanel() {
     typeof window !== "undefined"
       ? `${window.location.origin}/${cafeDetails?.slug}`
       : "";
-
-  // ... (Keep existing ADD/EDIT/DELETE logic for categories and items below) ...
   const handleAddCategory = async () => {
     if (!newCategory.trim() || !cafeId) return;
-    const cat = await addCategory(cafeId, newCategory);
-    setCategories([...categories, cat]);
-    setNewCategory("");
-    setShowCategoryModal(false);
+    try {
+      const cat = await addCategory(cafeId, newCategory);
+      // STRICT DEDUPLICATION: Only add if the ID doesn't already exist
+      setCategories((prev) => {
+        if (prev.some((c) => c.id === cat.id)) return prev;
+        return [...prev, cat];
+      });
+      setNewCategory("");
+      setShowCategoryModal(false);
+    } catch (error) {
+      alert("Failed to add category.");
+    }
   };
 
   const handleDeleteCategory = async (id) => {
@@ -330,8 +403,8 @@ export default function AdminPanel() {
         const matchedCategory = categories.find(
           (c) => c.id === savedItem.categoryId,
         );
-        setItems(
-          items.map((i) =>
+        setItems((prev) =>
+          prev.map((i) =>
             i.id === editingId
               ? { ...savedItem, Category: matchedCategory }
               : i,
@@ -342,7 +415,12 @@ export default function AdminPanel() {
         const matchedCategory = categories.find(
           (c) => c.id === savedItem.categoryId,
         );
-        setItems([{ ...savedItem, Category: matchedCategory }, ...items]);
+
+        // STRICT DEDUPLICATION: Only add if the ID doesn't already exist
+        setItems((prev) => {
+          if (prev.some((i) => i.id === savedItem.id)) return prev;
+          return [{ ...savedItem, Category: matchedCategory }, ...prev];
+        });
       }
       setCurrentView("DASHBOARD");
     } catch (error) {
@@ -577,8 +655,12 @@ export default function AdminPanel() {
                           <h3 className="font-bold text-[15px] text-[#111814]">
                             Menu Slider
                           </h3>
-                          <p className="text-[12px] font-medium text-neutral-500">
+                          <p className="text-[12px] font-medium text-neutral-500 mt-1">
                             Upload promotional banners for your menu.
+                            <br />
+                            <span className="text-amber-600 font-bold">
+                              Recommended: 800x400px (Max 800KB)
+                            </span>
                           </p>
                         </div>
                         {!isPremium && (
@@ -617,7 +699,7 @@ export default function AdminPanel() {
                           />
                           <button
                             onClick={() => handleDeleteBanner(banner.id)}
-                            className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-red-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-3 right-3 w-8 h-8 bg-white/95 backdrop-blur-md rounded-full flex items-center justify-center text-red-500 shadow-md active:scale-95 transition-all"
                           >
                             <svg
                               className="w-4 h-4"
@@ -668,6 +750,27 @@ export default function AdminPanel() {
                         Allow customers to call a waiter directly from their
                         table by scanning a unique QR code.
                       </p>
+                    </div>
+
+                    {/* Background Notifications Settings */}
+                    <div className="bg-white p-6 rounded-[24px] shadow-sm border border-neutral-100/50">
+                      <div className="flex justify-between items-center mb-2">
+                        <div>
+                          <h3 className="font-bold text-[15px] text-[#111814]">
+                            Background Alerts
+                          </h3>
+                          <p className="text-[12px] font-medium text-neutral-500 mt-1 leading-relaxed">
+                            Receive waiter requests on your device even when
+                            this dashboard is closed.
+                          </p>
+                        </div>
+                        <button
+                          onClick={handleEnablePushNotifications}
+                          className="bg-[#1A1C19] hover:bg-black transition-colors text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-xl flex-shrink-0"
+                        >
+                          Enable Alerts
+                        </button>
+                      </div>
                     </div>
 
                     {/* QR Code Generator Section */}
@@ -806,22 +909,42 @@ export default function AdminPanel() {
               exit={{ opacity: 0, y: 40 }}
               className="flex-1 flex flex-col h-full bg-white z-40"
             >
-              {/* ... (Keep your exact Item Form JSX here, omitted for brevity, it hasn't changed!) ... */}
               <header className="flex-none pt-12 pb-4 px-6 border-b border-neutral-100 flex items-center justify-between">
                 <button
                   onClick={() => setCurrentView("DASHBOARD")}
-                  className="text-[12px] font-bold text-neutral-500 tracking-wider"
+                  disabled={isSaving}
+                  className="text-[11px] font-bold text-neutral-400 hover:text-neutral-600 tracking-widest uppercase transition-colors"
                 >
-                  CANCEL
+                  Cancel
                 </button>
                 <h2 className="text-[15px] font-bold text-[#111814]">
                   {editingId ? "Edit Menu Item" : "New Menu Item"}
                 </h2>
                 <button
-                  onClick={handleSaveItem}
-                  className="text-[12px] font-bold text-[#111814] tracking-wider"
+                  onClick={async () => {
+                    setIsSaving(true);
+                    await handleSaveItem();
+                    setIsSaving(false);
+                  }}
+                  disabled={isSaving}
+                  className="bg-[#111814] text-white px-5 py-2 rounded-xl text-[11px] font-bold tracking-widest uppercase shadow-md hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
                 >
-                  SAVE
+                  {isSaving ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{
+                          repeat: Infinity,
+                          duration: 1,
+                          ease: "linear",
+                        }}
+                        className="w-3.5 h-3.5 border-[1.5px] border-white/30 border-t-white rounded-full"
+                      />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save"
+                  )}
                 </button>
               </header>
               <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8 space-y-6">
@@ -1020,15 +1143,31 @@ export default function AdminPanel() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow-inner">
-                    <svg className="w-6 h-6 text-red-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                    <svg
+                      className="w-6 h-6 text-red-600 animate-pulse"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2.5"
+                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                      />
+                    </svg>
                   </div>
                   <div>
-                    <p className="text-[10px] font-extrabold tracking-widest text-red-200 uppercase mb-0.5">Assistance Needed</p>
-                    <p className="font-extrabold text-white text-[20px] leading-none">Table {request.tableNumber}</p>
+                    <p className="text-[10px] font-extrabold tracking-widest text-red-200 uppercase mb-0.5">
+                      Assistance Needed
+                    </p>
+                    <p className="font-extrabold text-white text-[20px] leading-none">
+                      Table {request.tableNumber}
+                    </p>
                   </div>
                 </div>
-                
-                <button 
+
+                <button
                   onClick={() => handleResolveRequest(request.id)}
                   className="bg-black/20 hover:bg-black/40 transition-colors text-white text-[11px] font-bold tracking-widest uppercase px-4 py-2.5 rounded-xl backdrop-blur-md"
                 >
@@ -1053,9 +1192,13 @@ export default function AdminPanel() {
                 exit={{ scale: 0.9, y: 20 }}
                 className="bg-white rounded-[32px] p-6 w-full max-w-[340px] shadow-2xl relative"
               >
-                <h3 className="text-lg font-bold text-[#111814] mb-4">New Category</h3>
+                <h3 className="text-lg font-bold text-[#111814] mb-4">
+                  New Category
+                </h3>
                 <div className="mb-6">
-                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Category Name</label>
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">
+                    Category Name
+                  </label>
                   <input
                     type="text"
                     value={newCategory}
@@ -1066,14 +1209,14 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div className="flex gap-3">
-                  <button 
-                    onClick={() => setShowCategoryModal(false)} 
+                  <button
+                    onClick={() => setShowCategoryModal(false)}
                     className="flex-1 py-3.5 rounded-xl font-bold text-[12px] tracking-wider text-neutral-500 hover:bg-neutral-50 transition-colors"
                   >
                     CANCEL
                   </button>
-                  <button 
-                    onClick={handleAddCategory} 
+                  <button
+                    onClick={handleAddCategory}
                     className="flex-1 py-3.5 rounded-xl font-bold text-[12px] tracking-wider text-white bg-[#111814] shadow-[0_4px_14px_rgba(0,0,0,0.25)] hover:scale-[1.02] transition-transform"
                   >
                     SAVE
