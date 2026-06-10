@@ -40,9 +40,10 @@ export async function savePushSubscription(cafeId, subscription) {
   if (error) throw new Error(error.message);
   return true;
 }
+
 export async function getCategories(cafeId) {
   const { data, error } = await supabase
-    .from("Category") // Standardized to capital C
+    .from("Category") 
     .select("*")
     .eq("cafeId", cafeId)
     .order("createdAt", { ascending: true });
@@ -64,7 +65,7 @@ export async function addCategory(cafeId, name) {
       {
         cafeId: cafeId,
         name: name,
-        updatedAt: now, // Solved the missing timestamp error
+        updatedAt: now,
       },
     ])
     .select()
@@ -72,6 +73,28 @@ export async function addCategory(cafeId, name) {
 
   if (error) {
     console.error("Supabase Add Error:", error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+// NEW: Update Category Core Action
+export async function updateCategory(id, name) {
+  console.log("Updating category:", { id, name });
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("Category")
+    .update({
+      name: name,
+      updatedAt: now
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Update Category Error:", error);
     throw new Error(error.message);
   }
   return data;
@@ -104,12 +127,12 @@ export async function getMenuItems(cafeId) {
   }
   return data || [];
 }
+
 export async function addMenuItem(itemData) {
   const now = new Date().toISOString();
 
-  // We explicitly create the ID and Timestamp since Prisma is gone
   const payload = {
-    id: crypto.randomUUID(), // <-- THE FIX: Generate the unique ID here
+    id: crypto.randomUUID(), 
     ...itemData,
     updatedAt: now,
   };
@@ -126,6 +149,7 @@ export async function addMenuItem(itemData) {
   }
   return data;
 }
+
 export async function toggleItemStock(id, inStock) {
   const now = new Date().toISOString();
 
@@ -133,7 +157,7 @@ export async function toggleItemStock(id, inStock) {
     .from("MenuItem")
     .update({
       inStock: inStock,
-      updatedAt: now, // Updating stock should also update the timestamp
+      updatedAt: now,
     })
     .eq("id", id)
     .select()
@@ -156,18 +180,15 @@ export async function deleteMenuItem(id) {
   return { success: true };
 }
 
-// Add this at the bottom of adminActions.js
 export async function uploadImage(formData) {
   const file = formData.get("file");
   if (!file) throw new Error("No file found.");
 
-  // 1. Strict Server-Side Size Validation (800KB)
-  const MAX_FILE_SIZE = 800 * 1024; // 800KB in bytes
+  const MAX_FILE_SIZE = 800 * 1024; 
   if (file.size > MAX_FILE_SIZE) {
     throw new Error("File exceeds the 800KB limit.");
   }
 
-  // 2. Strict Server-Side Type Validation (Must be an image)
   if (!file.type.startsWith("image/")) {
     throw new Error("Only image files are allowed.");
   }
@@ -175,7 +196,6 @@ export async function uploadImage(formData) {
   const fileExt = file.name.split(".").pop();
   const fileName = `${crypto.randomUUID()}.${fileExt}`;
 
-  // 3. Upload to Supabase
   const { error } = await supabase.storage
     .from("menu-images")
     .upload(fileName, file);
@@ -185,7 +205,6 @@ export async function uploadImage(formData) {
     throw new Error("Failed to upload image. Please try again.");
   }
 
-  // 4. Return the public URL
   const { data } = supabase.storage.from("menu-images").getPublicUrl(fileName);
 
   return data.publicUrl;
@@ -212,7 +231,7 @@ export async function updateMenuItem(id, itemData) {
   }
   return data;
 }
-// Updates the Cafe's premium settings
+
 export async function updateCafeSettings(cafeId, hasTableService) {
   const { data, error } = await supabase
     .from("Cafe")
@@ -227,21 +246,20 @@ export async function updateCafeSettings(cafeId, hasTableService) {
   }
   return data;
 }
-// --- PUBLIC FACING ACTIONS ---
 
-// Fetch cafe details and menu by the URL slug (No login required)
-// Fetch cafe details and menu by the URL slug (No login required)
+// ------------------------------------------------------------------
+// --- PUBLIC FACING ACTIONS ---
+// ------------------------------------------------------------------
+
 export async function getPublicMenuBySlug(slug) {
-  // 1. Find the cafe
   const { data: cafe, error: cafeError } = await supabase
     .from("Cafe")
-    .select("id, name, slug, hasTableService, serviceType") // Added serviceType
+    .select("id, name, slug, hasTableService, serviceType") 
     .eq("slug", slug)
     .single();
 
   if (cafeError || !cafe) return null;
 
-  // 2. Fetch categories
   const { data: categories } = await supabase
     .from("Category")
     .select("*")
@@ -252,10 +270,8 @@ export async function getPublicMenuBySlug(slug) {
     .from("MenuItem")
     .select(`*, Category(name)`)
     .eq("cafeId", cafe.id)
-    // .eq('inStock', true)
     .order("createdAt", { ascending: false });
 
-  // 4. NEW: Fetch Premium Banners
   let banners = [];
   if (cafe.serviceType === "PREMIUM") {
     const { data: bannerData } = await supabase
@@ -268,19 +284,15 @@ export async function getPublicMenuBySlug(slug) {
 
   return { cafe, categories: categories || [], items: items || [], banners };
 }
-// Creates a new real-time waiter request
-// Creates a new real-time waiter request AND sends background push notifications
+
 export async function createServiceRequest(cafeId, tableNumber) {
-  // 1. Insert into database (Triggers the Realtime WebSocket for open tabs)
   const { error } = await supabase
     .from("ServiceRequest")
     .insert([{ cafeId, tableNumber, status: "pending" }]);
 
   if (error) throw new Error(error.message);
 
-  // 2. NEW: Trigger OS-Level Background Notifications for closed tabs
   try {
-    // Find all devices registered to this cafe owner
     const { data: subs } = await supabase
       .from("PushSubscriptions")
       .select("subscription")
@@ -293,7 +305,6 @@ export async function createServiceRequest(cafeId, tableNumber) {
         url: "/admin",
       });
 
-      // Send the alert to Apple/Google servers
       await Promise.all(
         subs.map((s) =>
           webpush.sendNotification(s.subscription, payload).catch((err) => {
@@ -309,7 +320,6 @@ export async function createServiceRequest(cafeId, tableNumber) {
   return true;
 }
 
-// Marks a request as resolved (for the admin dashboard)
 export async function resolveServiceRequest(requestId) {
   const { error } = await supabase
     .from("ServiceRequest")
@@ -320,11 +330,12 @@ export async function resolveServiceRequest(requestId) {
   return true;
 }
 
+// ------------------------------------------------------------------
 // ==========================================
 // --- PREMIUM FEATURE ACTIONS ---
 // ==========================================
+// ------------------------------------------------------------------
 
-// 1. Toggle Category Highlight (Premium)
 export async function toggleCategoryHighlight(categoryId, isHighlighted) {
   const { data, error } = await supabase
     .from("Category")
@@ -340,7 +351,6 @@ export async function toggleCategoryHighlight(categoryId, isHighlighted) {
   return data;
 }
 
-// 2. Fetch Banners for a Cafe
 export async function getBanners(cafeId) {
   const { data, error } = await supabase
     .from("CafeBanner")
@@ -356,7 +366,6 @@ export async function getBanners(cafeId) {
   return data;
 }
 
-// 3. Add a New Banner
 export async function addBanner(cafeId, imageUrl, sortOrder = 0) {
   const { data, error } = await supabase
     .from("CafeBanner")
@@ -371,7 +380,6 @@ export async function addBanner(cafeId, imageUrl, sortOrder = 0) {
   return data;
 }
 
-// 4. Delete a Banner
 export async function deleteBanner(bannerId) {
   const { error } = await supabase
     .from("CafeBanner")

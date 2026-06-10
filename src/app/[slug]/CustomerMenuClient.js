@@ -136,23 +136,101 @@ export default function CustomerMenuClient({ initialData, slug }) {
           >
             All
           </button>
-          {categories.map(category => (
-            <button 
-              key={category.id}
-              onClick={() => setActiveCategory(category.id)}
-              className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-[12px] font-bold tracking-wide transition-all 
-                ${activeCategory === category.id 
-                  ? (category.isHighlighted ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-md border-none' : 'bg-white text-[#111814] shadow-sm border border-neutral-200') 
-                  : (category.isHighlighted ? 'bg-amber-50/50 text-amber-700 border border-amber-200/50' : 'bg-transparent text-neutral-500')
-                }`}
-            >
-              {category.isHighlighted && <span className="text-xs">★</span>}
-              {category.name}
-            </button>
-          ))}
+     
+ {/* {categories.map(category => (
+  <button
+    key={category.id}
+    onClick={() => setActiveCategory(category.id)}
+    className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold tracking-wide transition-all
+      ${activeCategory === category.id
+        ? category.isHighlighted
+          ? 'bg-neutral-900 text-amber-50 border border-neutral-900 italic'
+          : 'bg-white text-[#111814] shadow-sm border border-neutral-200'
+        : category.isHighlighted
+          ? 'bg-neutral-900 text-amber-50 border border-neutral-900 italic'
+          : 'bg-transparent text-neutral-500'
+      }`}
+  >
+    {category.isHighlighted && (
+      <span className="text-[9px] font-black bg-red-500 text-white rounded-[3px] px-1 py-[1px] tracking-widest uppercase not-italic">
+        hot
+      </span>
+    )}
+    {category.name}
+  </button>
+))}  */}
+{/* {categories.map(category => (
+  <button
+    key={category.id}
+    onClick={() => setActiveCategory(category.id)}
+    className={`relative flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold tracking-wide transition-all
+      ${activeCategory === category.id
+        ? category.isHighlighted
+          ? 'text-neutral-800'
+          : 'bg-white text-[#111814] shadow-sm border border-neutral-200'
+        : category.isHighlighted
+          ? 'text-neutral-800'
+          : 'bg-transparent text-neutral-500'
+      }`}
+    style={category.isHighlighted ? {
+      background: 'transparent',
+      border: '1.5px solid transparent',
+      backgroundClip: 'padding-box',
+      boxShadow: '0 0 0 1.5px transparent',
+      outline: '1.5px solid',
+      outlineColor: 'transparent',
+      backgroundImage: 'none',
+    } : {}}
+  >
+    {category.isHighlighted && (
+      <span
+        className="absolute inset-[-1.5px] rounded-full -z-10 pointer-events-none"
+        style={{
+          background: 'linear-gradient(135deg, #c8a96e, #f0d898, #c8a96e, #8a6c3a)',
+        }}
+      />
+    )}
+    {category.isHighlighted && (
+      <span
+        className="absolute inset-[1px] rounded-full -z-10 bg-white pointer-events-none"
+      />
+    )}
+    {category.isHighlighted && (
+      <span
+        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+        style={{ background: 'linear-gradient(135deg, #c8a96e, #f0d898)' }}
+      />
+    )}
+    {category.name}
+  </button>
+))} */}
+
+{categories.map(category => (
+  <button
+    key={category.id}
+    onClick={() => setActiveCategory(category.id)}
+    className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold tracking-wide transition-all
+      ${activeCategory === category.id
+        ? category.isHighlighted
+          ? 'bg-amber-100 text-amber-900 border-[1.5px] border-amber-400'
+          : 'bg-white text-[#111814] shadow-sm border border-neutral-200'
+        : category.isHighlighted
+          ? 'bg-amber-100 text-amber-900 border-[1.5px] border-amber-400'
+          : 'bg-transparent text-neutral-500'
+      }`}
+  >
+    {category.isHighlighted && (
+      <svg className="w-3 h-3 text-amber-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
+    )}
+    {category.name}
+  </button>
+))}
+
+
         </div>
       </div>
-      {/* --- END STICKY TOP CONTAINER --- */}
 
       {/* --- COMPACT MENU ITEMS LIST (Dual Layout) --- */}
       <div className="p-4 sm:p-6 space-y-3 max-w-[600px] mx-auto">
