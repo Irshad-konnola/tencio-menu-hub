@@ -1,3 +1,4 @@
+
 // "use client";
 
 // import React, { useState, useEffect } from "react";
@@ -82,14 +83,20 @@
 //     }
 //   };
 
-//   const filteredItems = items.filter((item) => {
-//     const matchesCategory =
-//       activeCategory === "ALL" || item.categoryId === activeCategory;
-//     const matchesSearch = item.name
-//       .toLowerCase()
-//       .includes(searchQuery.toLowerCase());
-//     return matchesCategory && matchesSearch;
-//   });
+//   const filteredItems = items
+//     .filter((item) => {
+//       const matchesCategory =
+//         activeCategory === "ALL" || item.categoryId === activeCategory;
+//       const matchesSearch = item.name
+//         .toLowerCase()
+//         .includes(searchQuery.toLowerCase());
+//       return matchesCategory && matchesSearch;
+//     })
+//     .sort((a, b) => {
+//       // Sort in-stock items to the top, out-of-stock items to the bottom
+//       if (a.inStock === b.inStock) return 0;
+//       return a.inStock ? -1 : 1;
+//     });
 
 //   const showWaiterButton = cafe.hasTableService && tableNumber;
 //   const isPremium = cafe.serviceType === "PREMIUM";
@@ -366,7 +373,6 @@
 //   );
 // }
 
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -389,6 +395,7 @@ export default function CustomerMenuClient({ initialData, slug }) {
 
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false); // NEW: State for search toggle
 
   const [isCalling, setIsCalling] = useState(false);
   const [callSuccess, setCallSuccess] = useState(false);
@@ -471,49 +478,13 @@ export default function CustomerMenuClient({ initialData, slug }) {
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] font-sans antialiased pb-32 relative">
-      {/* --- STICKY TOP CONTAINER --- */}
-      <div className="sticky top-0 z-40 bg-[#F6F7F9] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.05)]">
-        <header className="bg-[#1A1C19] pt-12 pb-6 px-6 relative rounded-b-[32px] shadow-lg">
-          <div className="flex justify-between items-start mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-amber-300 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
-                <svg
-                  className="w-6 h-6 text-[#1A1C19]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2.5"
-                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-[22px] font-extrabold tracking-tight text-white leading-none uppercase mb-1">
-                  {cafe.name}
-                </h1>
-                <p className="text-[11px] font-bold text-amber-400 tracking-wider">
-                  Malappuram
-                </p>
-              </div>
-            </div>
-
-            {tableNumber && (
-              <div className="bg-white/10 border border-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm">
-                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
-                  Table {tableNumber.padStart(2, "0")}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+      {/* --- NORMAL HEADER (No longer sticky) --- */}
+      <header className="bg-[#1A1C19] pt-12 pb-6 px-6 relative rounded-b-[32px] shadow-lg z-30">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-amber-300 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
               <svg
-                className="w-4 h-4 text-neutral-400"
+                className="w-6 h-6 text-[#1A1C19]"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -521,53 +492,121 @@ export default function CustomerMenuClient({ initialData, slug }) {
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  strokeWidth="2.5"
+                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
                 />
               </svg>
             </div>
-            <input
-              type="text"
-              placeholder="Search dishes, drinks..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white/10 border border-white/10 text-white placeholder-neutral-400 text-sm rounded-2xl py-3.5 pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
-            />
-          </div>
-        </header>
-
-        {isPremium && banners.length > 0 && !searchQuery && (
-          <div className="w-full pt-6 pb-2 overflow-hidden" ref={emblaRef}>
-            <div className="flex touch-pan-y">
-              {banners.map((banner, index) => (
-                <div key={banner.id} className="flex-[0_0_85%] min-w-0 pl-6">
-                  <div className="w-full h-40 rounded-[24px] overflow-hidden shadow-sm relative border border-neutral-200/50">
-                    <img
-                      src={banner.imageUrl}
-                      alt={`Promo ${index}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-              ))}
-              <div className="flex-[0_0_1.5rem]" />
+            <div>
+              <h1 className="text-[22px] font-extrabold tracking-tight text-white leading-none uppercase mb-1">
+                {cafe.name}
+              </h1>
+              <p className="text-[11px] font-bold text-amber-400 tracking-wider">
+                Malappuram
+              </p>
             </div>
           </div>
-        )}
 
-        <div className="py-4 px-6 overflow-x-auto whitespace-nowrap hide-scrollbar flex gap-2 border-b border-neutral-200/60">
+          <div className="flex items-center gap-3">
+            {tableNumber && (
+              <div className="bg-white/10 border border-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                  Table {tableNumber.padStart(2, "0")}
+                </span>
+              </div>
+            )}
+            
+            {/* NEW: Search Toggle Icon Button */}
+            <button 
+              onClick={() => setIsSearchOpen(!isSearchOpen)}
+              className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors border border-white/10"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                {isSearchOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                )}
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* NEW: Expandable Search Bar */}
+        <AnimatePresence>
+          {isSearchOpen && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0, marginTop: 0 }}
+              animate={{ height: "auto", opacity: 1, marginTop: 24 }}
+              exit={{ height: 0, opacity: 0, marginTop: 0 }}
+              className="relative overflow-hidden"
+            >
+              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                <svg
+                  className="w-4 h-4 text-neutral-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Search dishes, drinks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white/10 border border-white/10 text-white placeholder-neutral-400 text-sm rounded-2xl py-3.5 pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      {/* Banners (No longer sticky) */}
+      {isPremium && banners.length > 0 && !searchQuery && (
+        <div className="w-full pt-6 pb-2 overflow-hidden" ref={emblaRef}>
+          <div className="flex touch-pan-y">
+            {banners.map((banner, index) => (
+              <div key={banner.id} className="flex-[0_0_85%] min-w-0 pl-6">
+                <div className="w-full h-40 rounded-[24px] overflow-hidden shadow-sm relative border border-neutral-200/50">
+                  <img
+                    src={banner.imageUrl}
+                    alt={`Promo ${index}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            ))}
+            <div className="flex-[0_0_1.5rem]" />
+          </div>
+        </div>
+      )}
+
+      {/* --- STICKY CATEGORY MENU --- */}
+      <div className="sticky top-0 z-40 bg-[#F6F7F9] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.05)] py-4 px-6 overflow-x-auto whitespace-nowrap hide-scrollbar flex gap-2 border-b border-neutral-200/60">
+        <button
+          onClick={() => setActiveCategory("ALL")}
+          className={`px-5 py-2 rounded-xl text-[12px] font-bold tracking-wide transition-all ${activeCategory === "ALL" ? "bg-white text-[#111814] shadow-sm border border-neutral-200" : "bg-transparent text-neutral-500"}`}
+        >
+          All
+        </button>
+
+        {categories.map((category) => (
           <button
-            onClick={() => setActiveCategory("ALL")}
-            className={`px-5 py-2 rounded-xl text-[12px] font-bold tracking-wide transition-all ${activeCategory === "ALL" ? "bg-white text-[#111814] shadow-sm border border-neutral-200" : "bg-transparent text-neutral-500"}`}
-          >
-            All
-          </button>
-
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setActiveCategory(category.id)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold tracking-wide transition-all
+            key={category.id}
+            onClick={() => setActiveCategory(category.id)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold tracking-wide transition-all
       ${
         activeCategory === category.id
           ? category.isHighlighted
@@ -577,27 +616,26 @@ export default function CustomerMenuClient({ initialData, slug }) {
             ? "bg-amber-100 text-amber-900 border-[1.5px] border-amber-400"
             : "bg-transparent text-neutral-500"
       }`}
-            >
-              {category.isHighlighted && (
-                <svg
-                  className="w-3 h-3 text-amber-500 flex-shrink-0"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
-              )}
-              {category.name}
-            </button>
-          ))}
-        </div>
+          >
+            {category.isHighlighted && (
+              <svg
+                className="w-3 h-3 text-amber-500 flex-shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            )}
+            {category.name}
+          </button>
+        ))}
       </div>
 
-      {/* --- COMPACT MENU ITEMS LIST (Dual Layout) --- */}
+      {/* --- COMPACT MENU ITEMS LIST --- */}
       <div className="p-4 sm:p-6 space-y-3 max-w-[600px] mx-auto">
         {filteredItems.length === 0 && (
           <p className="text-center text-sm font-medium text-neutral-400 pt-10">
@@ -671,18 +709,19 @@ export default function CustomerMenuClient({ initialData, slug }) {
         })}
       </div>
 
+      {/* --- SMALL FLOATING ACTION BUTTON (Call Waiter) --- */}
       <AnimatePresence>
         {showWaiterButton && (
           <motion.div
-            initial={{ opacity: 0, y: 100 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 100 }}
-            className="fixed bottom-6 left-0 right-0 px-6 z-50 max-w-[600px] mx-auto"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="fixed bottom-6 right-6 z-50"
           >
             {callSuccess ? (
-              <div className="w-full py-4 rounded-[20px] font-bold text-[13px] tracking-widest uppercase text-green-400 bg-[#1A1C19] border border-green-500/30 shadow-2xl flex items-center justify-center gap-2">
+              <div className="w-14 h-14 rounded-full bg-green-500 shadow-2xl flex items-center justify-center text-white border-2 border-white/20">
                 <svg
-                  className="w-5 h-5"
+                  className="w-6 h-6"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -694,13 +733,12 @@ export default function CustomerMenuClient({ initialData, slug }) {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                Waiter is on the way!
               </div>
             ) : (
               <button
                 onClick={handleCallWaiter}
                 disabled={isCalling}
-                className="w-full py-4 rounded-[20px] font-bold text-[13px] tracking-widest text-white bg-[#1A1C19] shadow-[0_15px_40px_rgba(0,0,0,0.3)] flex items-center justify-center gap-3 hover:scale-[1.02] transition-transform disabled:opacity-70 border border-white/5"
+                className="w-14 h-14 rounded-full bg-[#1A1C19] shadow-[0_15px_40px_rgba(0,0,0,0.3)] flex items-center justify-center hover:scale-[1.05] active:scale-95 transition-transform disabled:opacity-70 border border-white/10"
               >
                 {isCalling ? (
                   <motion.div
@@ -710,27 +748,22 @@ export default function CustomerMenuClient({ initialData, slug }) {
                       duration: 1,
                       ease: "linear",
                     }}
-                    className="w-5 h-5 border-2 border-white/30 border-t-amber-400 rounded-full"
+                    className="w-6 h-6 border-2 border-white/30 border-t-amber-400 rounded-full"
                   />
                 ) : (
-                  <>
-                    <div className="w-7 h-7 bg-white/10 rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-4 h-4 text-amber-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2.5"
-                          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                        />
-                      </svg>
-                    </div>
-                    Call Waiter to Table {tableNumber.padStart(2, "0")}
-                  </>
+                  <svg
+                    className="w-6 h-6 text-amber-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2.5"
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                    />
+                  </svg>
                 )}
               </button>
             )}
