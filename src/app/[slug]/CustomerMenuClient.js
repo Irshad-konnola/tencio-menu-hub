@@ -479,7 +479,7 @@ export default function CustomerMenuClient({ initialData, slug }) {
   return (
     <div className="min-h-screen bg-[#F6F7F9] font-sans antialiased pb-32 relative">
       {/* --- NORMAL HEADER (No longer sticky) --- */}
-      <header className="bg-[#1A1C19] pt-12 pb-6 px-6 relative rounded-b-[32px] shadow-lg z-30">
+      <header className="bg-[#1A1C19] pt-12 pb-6 px-6 relative  shadow-lg z-30">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-amber-300 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
