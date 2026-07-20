@@ -243,6 +243,39 @@ export default function AdminPanel() {
   }, [liveRequests]);
   // ==========================================
 
+
+  useEffect(() => {
+    let wakeLock = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          console.log('Screen Wake Lock active - Phone will not sleep');
+        }
+      } catch (err) {
+        console.error('Wake Lock failed:', err.name, err.message);
+      }
+    };
+
+    // Request it immediately on load
+    requestWakeLock();
+
+    // If the user minimizes the app and comes back, we have to request it again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestWakeLock();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (wakeLock) wakeLock.release();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+  
   useEffect(() => {
     async function checkAuthAndLoadData() {
       setIsLoading(true);
@@ -301,11 +334,11 @@ export default function AdminPanel() {
     return true;
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
-
+ const handleLock = () => {
+  // Remove the unlocked flag, keeping the Supabase session intact
+  sessionStorage.removeItem('dashboard_unlocked');
+  router.push('/login');
+};
   const handleToggleTableService = async () => {
     if (!enforcePremium()) return;
     try {
@@ -505,10 +538,16 @@ export default function AdminPanel() {
                     <h2 className="text-[10px] font-bold tracking-widest text-neutral-400 uppercase mb-0.5">{cafeDetails?.name} {isPremium && <span className="text-yellow-500 ml-1">★</span>}</h2>
                     <h1 className="text-lg font-bold tracking-tight text-[#111814]">Live Dashboard</h1>
                   </div>
-                  <button onClick={handleLogout} className="flex items-center gap-2 text-[10px] font-bold tracking-widest text-neutral-500 hover:text-red-500 uppercase transition-all bg-white border border-neutral-200 px-3 py-2 rounded-xl shadow-sm">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                    Logout
-                  </button>
+               <button 
+  onClick={handleLock} 
+  className="flex items-center gap-2 text-[10px] font-bold tracking-widest text-neutral-500 hover:text-orange-500 uppercase transition-all bg-white border border-neutral-200 px-3 py-2 rounded-xl shadow-sm"
+>
+  {/* Lock Icon */}
+  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+  </svg>
+  Lock Screen
+</button>
                 </div>
                 <div className="flex gap-4 border-b border-neutral-200 overflow-x-auto hide-scrollbar">
                   {["ITEMS", "CATEGORIES", "BANNERS", "SETTINGS"].map((tab) => (
