@@ -303,6 +303,9 @@ export async function createServiceRequest(cafeId, tableNumber) {
         title: "🔔 Table Needs Waiter!",
         body: `Table ${tableNumber} is calling for assistance.`,
         url: "/admin",
+        vibrate: [500, 250, 500, 250, 1000, 250, 500, 250, 500], // Long aggressive vibration
+        requireInteraction: true, // Keeps the notification on screen until dismissed
+        tag: "waiter-alert"
       });
 
       await Promise.all(
