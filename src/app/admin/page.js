@@ -10,8 +10,15 @@ import {
   getMenuItems, addMenuItem, toggleItemStock, deleteMenuItem,
   uploadImage, updateMenuItem, updateCafeSettings,
   getBanners, addBanner, deleteBanner, toggleCategoryHighlight,
-  resolveServiceRequest, savePushSubscription,
+  resolveServiceRequest, savePushSubscription, getCafeFeatures
 } from '../actions/adminActions';
+
+import ItemsTab from './tabs/ItemsTab';
+import CategoriesTab from './tabs/CategoriesTab';
+import BannersTab from './tabs/BannersTab';
+import SettingsTab from './tabs/SettingsTab';
+import BillingTab from './tabs/BillingTab';
+import ToggleSwitch from './tabs/ToggleSwitch';
 
 // ==========================================
 // STATIC UTILITIES & CONSTANTS
@@ -33,11 +40,7 @@ function urlBase64ToUint8Array(base64String) {
 // SUB-COMPONENTS
 // ==========================================
 
-const ToggleSwitch = ({ isOn, onToggle }) => (
-  <div onClick={onToggle} className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 flex-shrink-0 ${isOn ? "bg-[#111814]" : "bg-neutral-200"}`}>
-    <motion.div className="w-4 h-4 bg-white rounded-full shadow-sm" animate={{ x: isOn ? 20 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-  </div>
-);
+// ToggleSwitch moved to separate file
 
 const LiveNotificationCenter = ({ liveRequests, onResolve }) => (
   <div className="absolute top-6 right-6 sm:top-10 sm:right-10 z-[100] flex flex-col gap-3 w-[calc(100%-48px)] sm:w-[320px] max-w-full pointer-events-none">
@@ -147,6 +150,10 @@ const ItemForm = ({ editingId, isSaving, newItem, setNewItem, categories, formEr
             <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Item Name</label>
             <input type="text" value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} placeholder="e.g., Masala Dosa" className="w-full pb-2 border-b border-neutral-200 text-[15px] font-medium text-black focus:outline-none focus:border-black rounded-none" />
           </div>
+          <div>
+            <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Malayalam Name (optional)</label>
+            <input type="text" value={newItem.malayalamName || ""} onChange={(e) => setNewItem({ ...newItem, malayalamName: e.target.value })} placeholder="e.g., മസാല ദോശ" className="w-full pb-2 border-b border-neutral-200 text-[15px] font-medium text-black focus:outline-none focus:border-black rounded-none" />
+          </div>
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Category</label>
@@ -213,6 +220,7 @@ export default function AdminPanel() {
   const [imageFile, setImageFile] = useState(null);
   const [newItem, setNewItem] = useState({ name: "", price: "", categoryId: "", description: "", imageUrl: DEFAULT_IMAGE });
   const [isSaving, setIsSaving] = useState(false);
+  const [features, setFeatures] = useState({});
   const [liveRequests, setLiveRequests] = useState([]);
 
   // ==========================================
@@ -297,10 +305,12 @@ export default function AdminPanel() {
         const fetchedCategories = await getCategories(cafeData.id);
         const fetchedItems = await getMenuItems(cafeData.id);
         const fetchedBanners = await getBanners(cafeData.id);
+        const fetchedFeatures = await getCafeFeatures(cafeData.id);
 
         setCategories(fetchedCategories);
         setItems(fetchedItems);
         setBanners(fetchedBanners || []);
+        setFeatures(fetchedFeatures || {});
       } catch (error) {
         console.error("Failed to load dashboard:", error);
       } finally {
@@ -328,19 +338,13 @@ export default function AdminPanel() {
     try { await resolveServiceRequest(id); } catch { alert("Failed to clear request."); }
   };
 
-  const isPremium = cafeDetails?.serviceType?.toUpperCase() === "PREMIUM";
-  const enforcePremium = () => {
-    if (!isPremium) { setShowUpsellModal(true); return false; }
-    return true;
-  };
-
- const handleLock = () => {
+  const handleLock = () => {
   // Remove the unlocked flag, keeping the Supabase session intact
   sessionStorage.removeItem('dashboard_unlocked');
   router.push('/login');
 };
   const handleToggleTableService = async () => {
-    if (!enforcePremium()) return;
+    if (!features?.table_service?.enabled) { setShowUpsellModal(true); return; }
     try {
       const newState = !hasTableService;
       setHasTableService(newState);
@@ -379,7 +383,7 @@ export default function AdminPanel() {
   };
 
   const handleToggleHighlight = async (category) => {
-    if (!enforcePremium()) return;
+    if (!features?.category_highlight?.enabled) { setShowUpsellModal(true); return; }
     const newState = !category.isHighlighted;
     setCategories(categories.map((c) => c.id === category.id ? { ...c, isHighlighted: newState } : c));
     try { await toggleCategoryHighlight(category.id, newState); } catch {
@@ -389,7 +393,7 @@ export default function AdminPanel() {
   };
 
   const handleBannerUpload = async (e) => {
-    if (!enforcePremium()) { e.target.value = null; return; }
+    if (!features?.banners?.enabled) { e.target.value = null; setShowUpsellModal(true); return; }
     const file = e.target.files[0];
     if (!file || !cafeId) return;
 
@@ -472,13 +476,13 @@ export default function AdminPanel() {
 
   const openEditForm = (item) => {
     setEditingId(item.id);
-    setNewItem({ name: item.name, price: item.price, categoryId: item.categoryId, description: item.description || "", imageUrl: item.imageUrl || DEFAULT_IMAGE });
+    setNewItem({ name: item.name, malayalamName: item.malayalamName || "", price: item.price, categoryId: item.categoryId, description: item.description || "", imageUrl: item.imageUrl || DEFAULT_IMAGE });
     setImageFile(null); setFormError(""); setCurrentView("ITEM_FORM");
   };
 
   const openCreateForm = () => {
     setEditingId(null);
-    setNewItem({ name: "", price: "", categoryId: "", description: "", imageUrl: DEFAULT_IMAGE });
+    setNewItem({ name: "", malayalamName: "", price: "", categoryId: "", description: "", imageUrl: DEFAULT_IMAGE });
     setImageFile(null); setFormError(""); setCurrentView("ITEM_FORM");
   };
 
@@ -535,7 +539,7 @@ export default function AdminPanel() {
               <header className="flex-none bg-white pt-12 pb-4 px-6 border-b border-neutral-100 relative z-20">
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h2 className="text-[10px] font-bold tracking-widest text-neutral-400 uppercase mb-0.5">{cafeDetails?.name} {isPremium && <span className="text-yellow-500 ml-1">★</span>}</h2>
+                    <h2 className="text-[10px] font-bold tracking-widest text-neutral-400 uppercase mb-0.5">{cafeDetails?.name}</h2>
                     <h1 className="text-lg font-bold tracking-tight text-[#111814]">Live Dashboard</h1>
                   </div>
                <button 
@@ -550,139 +554,92 @@ export default function AdminPanel() {
 </button>
                 </div>
                 <div className="flex gap-4 border-b border-neutral-200 overflow-x-auto hide-scrollbar">
-                  {["ITEMS", "CATEGORIES", "BANNERS", "SETTINGS"].map((tab) => (
-                    <button key={tab} onClick={() => setDashboardTab(tab)} className={`pb-3 text-[11px] font-bold tracking-widest uppercase transition-colors relative flex-shrink-0 ${dashboardTab === tab ? "text-[#111814]" : "text-neutral-400"}`}>
-                      {tab}
-                      {dashboardTab === tab && <motion.div layoutId="adminTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#111814]" />}
-                    </button>
-                  ))}
+                  {(() => {
+                    const tabs = ["ITEMS", "CATEGORIES"];
+                    if (features?.billing?.enabled || features?.billing?.displayMode === 'locked') tabs.push("BILLING");
+                    if (features?.banners?.enabled || features?.banners?.displayMode === 'locked') tabs.push("BANNERS");
+                    tabs.push("SETTINGS");
+                    
+                    const handleTabClick = (tab) => {
+                      const keyMap = { BANNERS: 'banners', BILLING: 'billing' };
+                      const key = keyMap[tab];
+                      if (key && !features[key]?.enabled && features[key]?.displayMode === 'locked') {
+                        setShowUpsellModal(true);
+                        return;
+                      }
+                      setDashboardTab(tab);
+                    };
+
+                    return tabs.map((tab) => {
+                      const keyMap = { BANNERS: 'banners', BILLING: 'billing' };
+                      const key = keyMap[tab];
+                      const isLocked = key && !features[key]?.enabled && features[key]?.displayMode === 'locked';
+
+                      return (
+                        <button key={tab} onClick={() => handleTabClick(tab)} className={`pb-3 text-[11px] font-bold tracking-widest uppercase transition-colors relative flex-shrink-0 flex items-center gap-1 ${dashboardTab === tab ? "text-[#111814]" : "text-neutral-400"}`}>
+                          {tab}
+                          {isLocked && <span className="bg-purple-500 text-white text-[8px] px-1 rounded">PRO</span>}
+                          {dashboardTab === tab && <motion.div layoutId="adminTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#111814]" />}
+                        </button>
+                      );
+                    });
+                  })()}
                 </div>
               </header>
 
               <div className="flex-1 overflow-y-auto px-6 pt-5 pb-32">
                 {dashboardTab === "ITEMS" && (
-                  <div className="space-y-4">
-                    {items.length === 0 && <p className="text-sm text-neutral-400 text-center pt-10">No items yet. Add one!</p>}
-                    {items.map((item) => (
-                      <div key={item.id} className={`bg-white p-3.5 rounded-[18px] flex items-center gap-4 shadow-sm border border-neutral-100/50 transition-opacity ${!item.inStock ? "opacity-60" : ""}`}>
-                        <div className="w-12 h-12 bg-neutral-100 rounded-xl overflow-hidden flex-shrink-0"><img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /></div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-[14px] text-[#111814] truncate">{item.name}</h3>
-                          <p className="text-[12px] font-semibold text-neutral-500">₹{item.price} • {item.Category?.name || item.category?.name || "Uncategorized"}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1 border-r border-neutral-200 pr-3">
-                            <button onClick={() => openEditForm(item)} className="p-1.5 text-neutral-400 hover:text-blue-500 bg-neutral-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-                            <button onClick={() => handleDeleteItem(item.id)} className="p-1.5 text-neutral-400 hover:text-red-500 bg-neutral-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                          </div>
-                          <ToggleSwitch isOn={item.inStock} onToggle={() => handleToggle(item)} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <ItemsTab 
+                    items={items} 
+                    openEditForm={openEditForm} 
+                    handleDeleteItem={handleDeleteItem} 
+                    handleToggle={handleToggle} 
+                  />
                 )}
 
                 {dashboardTab === "CATEGORIES" && (
-                  <div className="space-y-3">
-                    {categories.length === 0 && <p className="text-sm text-neutral-400 text-center pt-10">No categories yet.</p>}
-                    {categories.map((category) => (
-                      <div key={category.id} className="bg-white p-4 rounded-[16px] flex justify-between items-center shadow-sm border border-neutral-100/50">
-                        <span className="font-bold text-[14px] text-[#111814]">{category.name}</span>
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => handleToggleHighlight(category)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-colors ${category.isHighlighted ? "bg-yellow-100 text-yellow-700 border border-yellow-200" : "bg-neutral-50 text-neutral-400 border border-neutral-200"}`}>
-                            <span className="text-xs">★</span> {category.isHighlighted ? "Highlighted" : "Highlight"}
-                          </button>
-                          <button onClick={() => openEditCategoryForm(category)} className="p-2 text-neutral-400 hover:text-blue-500 rounded-lg">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                          </button>
-                          <button onClick={() => handleDeleteCategory(category.id, category.name)} className="p-2 text-neutral-400 hover:text-red-500 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <CategoriesTab 
+                    categories={categories} 
+                    handleToggleHighlight={handleToggleHighlight} 
+                    openEditCategoryForm={openEditCategoryForm} 
+                    handleDeleteCategory={handleDeleteCategory} 
+                  />
                 )}
 
                 {dashboardTab === "BANNERS" && (
-                  <div className="space-y-6">
-                    <div className="bg-white p-6 rounded-[24px] shadow-sm border border-neutral-100/50">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="font-bold text-[15px] text-[#111814]">Menu Slider</h3>
-                          <p className="text-[12px] font-medium text-neutral-500 mt-1">Upload promotional banners for your menu.<br /><span className="text-amber-600 font-bold">Recommended: 800x400px (Max 800KB)</span></p>
-                        </div>
-                        {!isPremium && <span className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-md shadow-sm">Premium</span>}
-                      </div>
-                      <div className="relative">
-                        <input type="file" accept="image/jpeg, image/png, image/webp" onChange={handleBannerUpload} disabled={isUploadingBanner} className="w-full text-sm text-neutral-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-[11px] file:font-bold file:tracking-wider file:bg-[#111814] file:text-white hover:file:bg-neutral-800 file:transition-colors file:cursor-pointer disabled:opacity-50" />
-                        {isUploadingBanner && <span className="absolute right-4 top-2.5 text-xs font-bold text-neutral-400">Uploading...</span>}
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      {banners.map((banner, index) => (
-                        <div key={banner.id} className="relative bg-white rounded-[24px] overflow-hidden shadow-sm border border-neutral-100 group">
-                          <img src={banner.imageUrl} alt={`Banner ${index}`} className="w-full h-40 object-cover" />
-                          <button onClick={() => handleDeleteBanner(banner.id)} className="absolute top-3 right-3 w-8 h-8 bg-white/95 backdrop-blur-md rounded-full flex items-center justify-center text-red-500 shadow-md active:scale-95 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
-                        </div>
-                      ))}
-                      {banners.length === 0 && !isUploadingBanner && <p className="text-center text-sm font-medium text-neutral-400 pt-4">No banners active.</p>}
-                    </div>
-                  </div>
+                  <BannersTab 
+                    banners={banners} 
+                    handleBannerUpload={handleBannerUpload} 
+                    handleDeleteBanner={handleDeleteBanner} 
+                    isUploadingBanner={isUploadingBanner} 
+                    features={features} 
+                  />
                 )}
 
                 {dashboardTab === "SETTINGS" && (
-                  <div className="space-y-8">
-                    <div className="bg-white p-6 rounded-[24px] shadow-sm border border-neutral-100/50">
-                      <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-[15px] text-[#111814]">Smart Table Service</h3>
-                          {!isPremium && <span className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-md shadow-sm">Premium</span>}
-                        </div>
-                        <ToggleSwitch isOn={hasTableService} onToggle={handleToggleTableService} />
-                      </div>
-                      <p className="text-[12px] font-medium text-neutral-500 leading-relaxed">Allow customers to call a waiter directly from their table by scanning a unique QR code.</p>
-                    </div>
-
-                    <div className="bg-white p-6 rounded-[24px] shadow-sm border border-neutral-100/50">
-                      <div className="flex justify-between items-center mb-2">
-                        <div>
-                          <h3 className="font-bold text-[15px] text-[#111814]">Background Alerts</h3>
-                          <p className="text-[12px] font-medium text-neutral-500 mt-1 leading-relaxed">Receive waiter requests on your device even when this dashboard is closed.</p>
-                        </div>
-                        <button onClick={handleEnablePushNotifications} className="bg-[#1A1C19] hover:bg-black transition-colors text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-xl flex-shrink-0">Enable Alerts</button>
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-6 rounded-[24px] shadow-sm border border-neutral-100/50">
-                      <h3 className="font-bold text-[15px] text-[#111814] mb-4">QR Codes</h3>
-                      {!hasTableService ? (
-                        <div className="flex flex-col items-center justify-center p-6 bg-neutral-50 rounded-2xl border border-neutral-200 border-dashed">
-                          <div className="bg-white p-4 rounded-xl shadow-sm mb-4"><QRCodeCanvas id="qr-global" value={baseUrl} size={150} level="H" /></div>
-                          <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest text-center mb-4">Global Store Code</p>
-                          <button onClick={() => downloadQR("qr-global", `${cafeDetails?.slug}-global-qr`)} className="flex items-center gap-2 bg-[#111814] text-white px-4 py-2 rounded-xl text-[11px] font-bold tracking-wider uppercase">Download</button>
-                        </div>
-                      ) : (
-                        <div className="space-y-6">
-                          <div>
-                            <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Generate Codes for Tables</label>
-                            <input type="number" value={tableCount} onChange={(e) => { const val = e.target.value; setTableCount(val === "" ? "" : Math.min(50, parseInt(val, 10))); }} onBlur={() => { if (!tableCount || tableCount < 1) setTableCount(1); }} className="w-full pb-2 border-b border-neutral-200 text-[15px] font-medium text-black focus:outline-none focus:border-black rounded-none bg-transparent" />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            {Array.from({ length: tableCount || 0 }).map((_, i) => (
-                              <div key={i} className="flex flex-col items-center justify-center p-4 bg-neutral-50 rounded-2xl border border-neutral-100">
-                                <div className="bg-white p-3 rounded-xl shadow-sm mb-3"><QRCodeCanvas id={`qr-table-${i + 1}`} value={`${baseUrl}?table=${i + 1}`} size={100} level="H" /></div>
-                                <p className="text-[11px] font-bold text-[#111814] uppercase tracking-widest mb-3">Table {i + 1}</p>
-                                <button onClick={() => downloadQR(`qr-table-${i + 1}`, `${cafeDetails?.slug}-table-${i + 1}`)} className="bg-white border border-neutral-200 text-neutral-600 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase">Save</button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <SettingsTab 
+                    hasTableService={hasTableService} 
+                    handleToggleTableService={handleToggleTableService} 
+                    handleEnablePushNotifications={handleEnablePushNotifications} 
+                    tableCount={tableCount} 
+                    setTableCount={setTableCount} 
+                    downloadQR={downloadQR} 
+                    baseUrl={baseUrl} 
+                    cafeDetails={cafeDetails} 
+                    features={features} 
+                  />
+                )}
+                
+                {dashboardTab === "BILLING" && (
+                  <BillingTab 
+                    items={items} 
+                    cafeId={cafeId} 
+                    cafeDetails={cafeDetails} 
+                  />
                 )}
               </div>
 
-              {dashboardTab !== "SETTINGS" && dashboardTab !== "BANNERS" && (
+              {dashboardTab !== "SETTINGS" && dashboardTab !== "BANNERS" && dashboardTab !== "BILLING" && (
                 <div className="absolute bottom-6 right-6 z-30">
                   <button onClick={() => {
                     if (dashboardTab === "ITEMS") {

@@ -260,6 +260,18 @@ export async function getPublicMenuBySlug(slug) {
 
   if (cafeError || !cafe) return null;
 
+  const { data: featureRows } = await supabase
+    .from("CafeFeatures")
+    .select("*")
+    .eq("cafeId", cafe.id);
+    
+  const features = {};
+  if (featureRows) {
+    featureRows.forEach(f => {
+      features[f.featureKey] = { enabled: f.enabled, displayMode: f.displayMode };
+    });
+  }
+
   const { data: categories } = await supabase
     .from("Category")
     .select("*")
@@ -273,7 +285,7 @@ export async function getPublicMenuBySlug(slug) {
     .order("createdAt", { ascending: false });
 
   let banners = [];
-  if (cafe.serviceType === "PREMIUM") {
+  if (features.banners?.enabled) {
     const { data: bannerData } = await supabase
       .from("CafeBanner")
       .select("*")
@@ -282,7 +294,7 @@ export async function getPublicMenuBySlug(slug) {
     banners = bannerData || [];
   }
 
-  return { cafe, categories: categories || [], items: items || [], banners };
+  return { cafe, features, categories: categories || [], items: items || [], banners };
 }
 
 export async function createServiceRequest(cafeId, tableNumber) {
@@ -394,4 +406,229 @@ export async function deleteBanner(bannerId) {
     throw new Error(error.message);
   }
   return true;
+}
+
+// ------------------------------------------------------------------
+// ==========================================
+// --- TENANT FEATURES & BILLING ACTIONS ---
+// ==========================================
+// ------------------------------------------------------------------
+
+export async function getCafeFeatures(cafeId) {
+  const { data, error } = await supabase
+    .from("CafeFeatures")
+    .select("*")
+    .eq("cafeId", cafeId);
+    
+  if (error) {
+    console.error("Failed to fetch features:", error);
+    return {};
+  }
+  
+  const features = {};
+  data.forEach(f => {
+    features[f.featureKey] = { enabled: f.enabled, displayMode: f.displayMode };
+  });
+  return features;
+}
+
+export async function createBill(cafeId, billData) {
+  const { data, error } = await supabase
+    .from("Bill")
+    .insert([{ cafeId, ...billData }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to create bill:", error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+export async function getBills(cafeId) {
+  const { data, error } = await supabase
+    .from("Bill")
+    .select("*")
+    .eq("cafeId", cafeId)
+    .order("createdAt", { ascending: false });
+
+  if (error) {
+    console.error("Failed to fetch bills:", error);
+    return [];
+  }
+  return data;
+}
+
+export async function deleteBill(id) {
+  const { error } = await supabase
+    .from("Bill")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Failed to delete bill:", error);
+    throw new Error(error.message);
+  }
+  return true;
+}
+
+// ------------------------------------------------------------------
+// ==========================================
+// --- SUPER ADMIN ACTIONS ---
+// ==========================================
+// ------------------------------------------------------------------
+
+import { cookies } from 'next/headers';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+
+export async function verifySuperAdminLogin(email, password) {
+  if (!supabaseAdmin) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing in .env");
+  }
+  const adminEmail = process.env.SUPERADMIN_EMAIL;
+  const adminPassword = process.env.SUPERADMIN_PASSWORD;
+
+  if (!adminEmail || !adminPassword) {
+    throw new Error(`Super admin credentials not configured. Email: ${adminEmail}`);
+  }
+
+  if (email !== adminEmail) {
+    throw new Error("Invalid email.");
+  }
+
+  if (password !== adminPassword) {
+    throw new Error("Invalid password.");
+  }
+
+  // Create a session in DB
+  const token = crypto.randomUUID();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
+
+  const { error } = await supabaseAdmin
+    .from("SuperAdminSession")
+    .insert([{ token, expiresAt: expiresAt.toISOString() }]);
+
+  if (error) {
+    console.error("Failed to create super admin session:", error);
+    throw new Error("Failed to create session.");
+  }
+
+  // Set cookie
+  const cookieStore = await cookies();
+  cookieStore.set('superadmin_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    expires: expiresAt,
+    path: '/'
+  });
+
+  return true;
+}
+
+export async function verifySuperAdminSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('superadmin_token')?.value;
+
+  if (!token) return false;
+
+  if (!supabaseAdmin) return false;
+
+  const { data, error } = await supabaseAdmin
+    .from("SuperAdminSession")
+    .select("*")
+    .eq("token", token)
+    .single();
+
+  if (error || !data) return false;
+
+  if (new Date(data.expiresAt) < new Date()) {
+    // Session expired
+    await superAdminLogout();
+    return false;
+  }
+
+  return true;
+}
+
+export async function superAdminLogout() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('superadmin_token')?.value;
+
+  if (token && supabaseAdmin) {
+    await supabaseAdmin
+      .from("SuperAdminSession")
+      .delete()
+      .eq("token", token);
+  }
+
+  cookieStore.delete('superadmin_token');
+  return true;
+}
+
+export async function getAllTenantsWithFeatures() {
+  if (!supabaseAdmin) throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing in .env");
+
+  // Join Cafe with CafeFeatures
+  const { data: cafes, error: cafeError } = await supabaseAdmin
+    .from("Cafe")
+    .select("id, name, slug");
+
+  if (cafeError) {
+    console.error("Failed to fetch tenants:", cafeError);
+    throw new Error(cafeError.message);
+  }
+
+  const { data: features, error: featuresError } = await supabaseAdmin
+    .from("CafeFeatures")
+    .select("*");
+
+  if (featuresError) {
+    console.error("Failed to fetch features:", featuresError);
+    throw new Error(featuresError.message);
+  }
+
+  // Map features to cafes
+  const cafesWithFeatures = cafes.map(cafe => {
+    const cafeFeats = features.filter(f => f.cafeId === cafe.id);
+    const featureMap = {};
+    // ensure canonical keys exist even if not seeded properly yet
+    const canonicalKeys = ['billing', 'table_service', 'banners', 'category_highlight'];
+    
+    canonicalKeys.forEach(key => {
+      const feat = cafeFeats.find(f => f.featureKey === key);
+      if (feat) {
+        featureMap[key] = { enabled: feat.enabled, displayMode: feat.displayMode };
+      } else {
+        featureMap[key] = { enabled: false, displayMode: 'hidden' };
+      }
+    });
+
+    return {
+      ...cafe,
+      features: featureMap
+    };
+  });
+
+  return cafesWithFeatures;
+}
+
+export async function updateTenantFeature(cafeId, featureKey, enabled, displayMode) {
+  if (!supabaseAdmin) throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing in .env");
+
+  const { data, error } = await supabaseAdmin
+    .from("CafeFeatures")
+    .upsert(
+      { cafeId, featureKey, enabled, displayMode, updatedAt: new Date().toISOString() },
+      { onConflict: 'cafeId, featureKey' }
+    )
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to update feature:", error);
+    throw new Error(error.message);
+  }
+  return data;
 }
