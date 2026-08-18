@@ -10,7 +10,8 @@ import {
   getMenuItems, addMenuItem, toggleItemStock, deleteMenuItem,
   uploadImage, updateMenuItem, updateCafeSettings,
   getBanners, addBanner, deleteBanner, toggleCategoryHighlight,
-  resolveServiceRequest, savePushSubscription, getCafeFeatures
+  resolveServiceRequest, savePushSubscription, getCafeFeatures,
+  toggleItemFavorite
 } from '../actions/adminActions';
 
 import ItemsTab from './tabs/ItemsTab';
@@ -96,7 +97,15 @@ const CategoryModal = ({ isOpen, onClose, newCategory, setNewCategory, onSave, i
           <h3 className="text-lg font-bold text-[#111814] mb-4">{isEditing ? "Edit Category" : "New Category"}</h3>
           <div className="mb-6">
             <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Category Name</label>
-            <input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="e.g., Hot Beverages" className="w-full pb-2 border-b border-neutral-200 text-[15px] font-medium text-black focus:outline-none focus:border-black rounded-none bg-transparent" autoFocus />
+            <input type="text" value={newCategory.name} onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })} placeholder="e.g., Hot Beverages" className="w-full pb-2 border-b border-neutral-200 text-[15px] font-medium text-black focus:outline-none focus:border-black rounded-none bg-transparent" autoFocus />
+          </div>
+          <div className="flex gap-4 mb-6">
+            <div className="flex-1 flex flex-col pb-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={newCategory.isHidden} onChange={(e) => setNewCategory({...newCategory, isHidden: e.target.checked})} className="w-4 h-4 text-black focus:ring-black border-gray-300 rounded" />
+                <span className="text-[13px] font-bold text-neutral-500">Hide from Public</span>
+              </label>
+            </div>
           </div>
           <div className="flex gap-3">
             <button onClick={onClose} className="flex-1 py-3.5 rounded-xl font-bold text-[12px] tracking-wider text-neutral-500 hover:bg-neutral-50 transition-colors">CANCEL</button>
@@ -212,13 +221,13 @@ export default function AdminPanel() {
   
   // -- CATEGORY STATES (EXPANDED FOR EDIT FEATURE) --
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [newCategory, setNewCategory] = useState("");
+  const [newCategory, setNewCategory] = useState({ name: "", sortOrder: 0, isHidden: false });
   const [editingCategoryId, setEditingCategoryId] = useState(null);
 
   const [editingId, setEditingId] = useState(null);
   const [formError, setFormError] = useState("");
   const [imageFile, setImageFile] = useState(null);
-  const [newItem, setNewItem] = useState({ name: "", price: "", categoryId: "", description: "", imageUrl: DEFAULT_IMAGE });
+  const [newItem, setNewItem] = useState({ name: "", malayalamName: "", price: "", categoryId: "", description: "", sortOrder: 0, isFavorite: false, imageUrl: DEFAULT_IMAGE });
   const [isSaving, setIsSaving] = useState(false);
   const [features, setFeatures] = useState({});
   const [liveRequests, setLiveRequests] = useState([]);
@@ -436,19 +445,19 @@ export default function AdminPanel() {
 
   // -- EXPANDED CATEGORY ROUTINES (SAVE/EDIT) --
   const handleSaveCategory = async () => {
-    if (!newCategory.trim() || !cafeId) return;
+    if (!newCategory.name.trim() || !cafeId) return;
     try {
       if (editingCategoryId) {
         // Edit Action
-        const updatedCat = await updateCategory(editingCategoryId, newCategory);
-        setCategories(categories.map((c) => c.id === editingCategoryId ? { ...c, name: newCategory } : c));
-        setItems((prev) => prev.map((item) => item.categoryId === editingCategoryId ? { ...item, Category: { ...item.Category, name: newCategory } } : item));
+        const updatedCat = await updateCategory(editingCategoryId, newCategory.name, newCategory.sortOrder, newCategory.isHidden);
+        setCategories(categories.map((c) => c.id === editingCategoryId ? { ...c, ...updatedCat } : c));
+        setItems((prev) => prev.map((item) => item.categoryId === editingCategoryId ? { ...item, Category: { ...item.Category, name: newCategory.name } } : item));
       } else {
         // Add Action
-        const cat = await addCategory(cafeId, newCategory);
+        const cat = await addCategory(cafeId, newCategory.name, newCategory.sortOrder, newCategory.isHidden);
         setCategories((prev) => prev.some((c) => c.id === cat.id) ? prev : [...prev, cat]);
       }
-      setNewCategory("");
+      setNewCategory({ name: "", sortOrder: 0, isHidden: false });
       setEditingCategoryId(null);
       setShowCategoryModal(false);
     } catch { 
@@ -458,7 +467,7 @@ export default function AdminPanel() {
 
   const openEditCategoryForm = (category) => {
     setEditingCategoryId(category.id);
-    setNewCategory(category.name);
+    setNewCategory({ name: category.name, sortOrder: category.sortOrder || 0, isHidden: category.isHidden || false });
     setShowCategoryModal(true);
   };
 
@@ -476,13 +485,13 @@ export default function AdminPanel() {
 
   const openEditForm = (item) => {
     setEditingId(item.id);
-    setNewItem({ name: item.name, malayalamName: item.malayalamName || "", price: item.price, categoryId: item.categoryId, description: item.description || "", imageUrl: item.imageUrl || DEFAULT_IMAGE });
+    setNewItem({ name: item.name, malayalamName: item.malayalamName || "", price: item.price, categoryId: item.categoryId, description: item.description || "", sortOrder: item.sortOrder || 0, isFavorite: item.isFavorite || false, imageUrl: item.imageUrl || DEFAULT_IMAGE });
     setImageFile(null); setFormError(""); setCurrentView("ITEM_FORM");
   };
 
   const openCreateForm = () => {
     setEditingId(null);
-    setNewItem({ name: "", malayalamName: "", price: "", categoryId: "", description: "", imageUrl: DEFAULT_IMAGE });
+    setNewItem({ name: "", malayalamName: "", price: "", categoryId: "", description: "", sortOrder: 0, isFavorite: false, imageUrl: DEFAULT_IMAGE });
     setImageFile(null); setFormError(""); setCurrentView("ITEM_FORM");
   };
 
@@ -525,6 +534,17 @@ export default function AdminPanel() {
     if (confirm("Delete this item?")) {
       setItems(items.filter((i) => i.id !== id));
       await deleteMenuItem(id);
+    }
+  };
+
+  const handleToggleFavorite = async (item) => {
+    const newState = !item.isFavorite;
+    setItems(items.map((i) => (i.id === item.id ? { ...i, isFavorite: newState } : i)));
+    try {
+      await toggleItemFavorite(item.id, newState);
+    } catch {
+      setItems(items.map((i) => (i.id === item.id ? { ...i, isFavorite: !newState } : i)));
+      alert("Failed to update favorite status.");
     }
   };
 
@@ -635,6 +655,7 @@ export default function AdminPanel() {
                     items={items} 
                     cafeId={cafeId} 
                     cafeDetails={cafeDetails} 
+                    handleToggleFavorite={handleToggleFavorite}
                   />
                 )}
               </div>
@@ -646,7 +667,7 @@ export default function AdminPanel() {
                       openCreateForm();
                     } else {
                       setEditingCategoryId(null);
-                      setNewCategory("");
+                      setNewCategory({ name: "", sortOrder: 0, isHidden: false });
                       setShowCategoryModal(true);
                     }
                   }} className="w-14 h-14 bg-[#111814] rounded-full shadow-[0_8px_20px_rgba(0,0,0,0.3)] flex items-center justify-center hover:scale-105 transition-transform"><svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg></button>
@@ -670,7 +691,7 @@ export default function AdminPanel() {
         {/* Category Modal with tracking hooks for edit mode layouts */}
         <CategoryModal 
           isOpen={showCategoryModal} 
-          onClose={() => { setShowCategoryModal(false); setEditingCategoryId(null); setNewCategory(""); }} 
+          onClose={() => { setShowCategoryModal(false); setEditingCategoryId(null); setNewCategory({ name: "", sortOrder: 0, isHidden: false }); }} 
           newCategory={newCategory} 
           setNewCategory={setNewCategory} 
           onSave={handleSaveCategory}

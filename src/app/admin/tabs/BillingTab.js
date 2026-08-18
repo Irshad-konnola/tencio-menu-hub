@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createBill, getBills, deleteBill } from '@/app/actions/adminActions';
 import * as htmlToImage from 'html-to-image';
 
-export default function BillingTab({ items, cafeId, cafeDetails }) {
+export default function BillingTab({ items, cafeId, cafeDetails, handleToggleFavorite }) {
   const [bills, setBills] = useState([]);
   const [billItems, setBillItems] = useState([]);
   const [customerName, setCustomerName] = useState('');
@@ -13,6 +13,7 @@ export default function BillingTab({ items, cafeId, cafeDetails }) {
   const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [viewState, setViewState] = useState('BUILDER'); // BUILDER, HISTORY
+  const [documentType, setDocumentType] = useState('invoice'); // invoice, quotation
   
   const billRef = useRef(null);
 
@@ -43,7 +44,7 @@ export default function BillingTab({ items, cafeId, cafeDetails }) {
         name: item.name,
         malayalamName: item.malayalamName || '',
         quantity: 1,
-        unit: 'piece',
+        unit: 'kg',
         rate: item.price
       }]);
     }
@@ -76,6 +77,7 @@ export default function BillingTab({ items, cafeId, cafeDetails }) {
         deliveryCharge: parseFloat(deliveryCharge || 0),
         grandTotal,
         billDate: new Date().toISOString().split('T')[0],
+        documentType,
       };
       await createBill(cafeId, billData);
 
@@ -156,14 +158,56 @@ export default function BillingTab({ items, cafeId, cafeDetails }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-4 rounded-[16px] shadow-sm border border-neutral-100/50">
-              <h3 className="text-sm font-bold mb-3 uppercase tracking-widest text-neutral-400">Add Items</h3>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {items.map(item => (
-                  <div key={item.id} onClick={() => addItemToBill(item)} className="flex justify-between items-center p-2 hover:bg-neutral-50 rounded-lg cursor-pointer transition-colors border-b border-neutral-100 last:border-0">
-                    <span className="text-sm font-medium">{item.name}</span>
-                    <span className="text-sm font-bold">₹{item.price}</span>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-400">Add Items</h3>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                {/* Favorites Section */}
+                {items.some(i => i.isFavorite) && (
+                  <div className="mb-4">
+                    <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                      <span>★</span> Favorites
+                    </div>
+                    {items.filter(i => i.isFavorite).map(item => {
+                      const isSelected = billItems.some(i => i.menuItemId === item.id);
+                      return (
+                        <div key={`fav-${item.id}`} className={`flex justify-between items-center p-2 rounded-lg transition-colors border mb-2 ${isSelected ? 'bg-green-50 border-green-200' : 'hover:bg-neutral-50 border-neutral-100'} last:border-0`}>
+                          <div className="flex-1 cursor-pointer flex items-center gap-2" onClick={() => addItemToBill(item)}>
+                            {isSelected && <span className="text-green-500 font-bold text-xs">✓</span>}
+                            <span className={`text-sm font-medium ${isSelected ? 'text-green-800' : ''}`}>{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold">₹{item.price}</span>
+                            <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(item); }} className="text-yellow-400 hover:text-yellow-500 transition-colors" title="Remove from favorites">
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="h-px bg-neutral-200 my-4" />
                   </div>
-                ))}
+                )}
+                
+                {/* All Items */}
+                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-2">All Menu Items</div>
+                {items.map(item => {
+                  const isSelected = billItems.some(i => i.menuItemId === item.id);
+                  return (
+                    <div key={item.id} className={`flex justify-between items-center p-2 rounded-lg transition-colors border mb-2 ${isSelected ? 'bg-green-50 border-green-200' : 'hover:bg-neutral-50 border-neutral-100'} last:border-0`}>
+                      <div className="flex-1 cursor-pointer flex items-center gap-2" onClick={() => addItemToBill(item)}>
+                        {isSelected && <span className="text-green-500 font-bold text-xs">✓</span>}
+                        <span className={`text-sm font-medium ${isSelected ? 'text-green-800' : ''}`}>{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold">₹{item.price}</span>
+                        <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(item); }} className={`${item.isFavorite ? 'text-yellow-400 hover:text-yellow-500' : 'text-neutral-300 hover:text-yellow-400'} transition-colors`} title="Toggle favorite">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -180,9 +224,9 @@ export default function BillingTab({ items, cafeId, cafeDetails }) {
                     <div className="flex items-center gap-2">
                       <input type="number" min="0.1" step="any" value={item.quantity} onChange={e => updateBillItem(idx, 'quantity', parseFloat(e.target.value) || 0)} className="w-16 bg-white border border-neutral-200 rounded px-2 py-1 text-xs" />
                       <select value={item.unit} onChange={e => updateBillItem(idx, 'unit', e.target.value)} className="bg-white border border-neutral-200 rounded px-2 py-1 text-xs">
+                        <option value="kg">kg</option>
                         <option value="piece">pc</option>
                         <option value="plate">plate</option>
-                        <option value="kg">kg</option>
                         <option value="g">g</option>
                         <option value="pack">pack</option>
                       </select>
@@ -207,6 +251,13 @@ export default function BillingTab({ items, cafeId, cafeDetails }) {
                   <span>Total</span>
                   <span>₹{grandTotal.toFixed(2)}</span>
                 </div>
+
+                <div className="pt-2">
+                  <div className="flex gap-2">
+                    <button onClick={() => setDocumentType('invoice')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors border ${documentType === 'invoice' ? 'bg-[#111814] text-white border-[#111814]' : 'bg-white text-neutral-500 border-neutral-200 hover:bg-neutral-50'}`}>INVOICE</button>
+                    <button onClick={() => setDocumentType('quotation')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors border ${documentType === 'quotation' ? 'bg-[#111814] text-white border-[#111814]' : 'bg-white text-neutral-500 border-neutral-200 hover:bg-neutral-50'}`}>QUOTATION</button>
+                  </div>
+                </div>
                 
                 <button 
                   onClick={handleGenerateAndShare}
@@ -224,7 +275,7 @@ export default function BillingTab({ items, cafeId, cafeDetails }) {
             <div ref={billRef} className="w-[400px] bg-white p-6 pb-10 text-[#111814] font-sans">
               <div className="text-center mb-6 border-b-2 border-dashed border-neutral-300 pb-4">
                 <h1 className="text-2xl font-black uppercase tracking-tight">{cafeDetails?.name}</h1>
-                <p className="text-sm font-medium text-neutral-500">Receipt / Bill</p>
+                <p className="text-sm font-medium text-neutral-500">{documentType === 'quotation' ? 'QUOTATION' : 'RECEIPT / INVOICE'}</p>
               </div>
               <div className="flex justify-between text-sm font-medium mb-4">
                 <div>

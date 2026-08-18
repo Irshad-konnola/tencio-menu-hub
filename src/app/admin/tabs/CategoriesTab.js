@@ -7,8 +7,11 @@ export default function CategoriesTab({ categories, handleToggleHighlight, openE
     <div className="space-y-3">
       {categories.length === 0 && <p className="text-sm text-neutral-400 text-center pt-10">No categories yet.</p>}
       {categories.map((category) => (
-        <div key={category.id} className="bg-white p-4 rounded-[16px] flex justify-between items-center shadow-sm border border-neutral-100/50">
-          <span className="font-bold text-[14px] text-[#111814]">{category.name}</span>
+        <div key={category.id} className={`bg-white p-4 rounded-[16px] flex justify-between items-center shadow-sm border ${category.isHidden ? 'border-dashed border-neutral-300 opacity-60' : 'border-neutral-100/50'}`}>
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-[14px] text-[#111814]">{category.name}</span>
+            {category.isHidden && <span className="bg-neutral-200 text-neutral-600 text-[9px] font-bold uppercase px-2 py-0.5 rounded">Hidden</span>}
+          </div>
           <div className="flex items-center gap-2">
             <button onClick={() => handleToggleHighlight(category)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-colors ${category.isHighlighted ? "bg-yellow-100 text-yellow-700 border border-yellow-200" : "bg-neutral-50 text-neutral-400 border border-neutral-200"}`}>
               <span className="text-xs">★</span> {category.isHighlighted ? "Highlighted" : "Highlight"}

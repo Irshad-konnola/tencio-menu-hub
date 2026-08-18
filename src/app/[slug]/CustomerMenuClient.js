@@ -99,7 +99,7 @@ export default function CustomerMenuClient({ initialData, slug }) {
         return a.inStock ? -1 : 1;
       }
       
-      // 2. ENHANCEMENT: If both have same stock status, sort by oldest first (first added displays first)
+      // 2. ENHANCEMENT: If both have same stock status and sort order, sort by oldest first
       if (a.createdAt && b.createdAt) {
         return new Date(a.createdAt) - new Date(b.createdAt);
       }
@@ -249,7 +249,7 @@ export default function CustomerMenuClient({ initialData, slug }) {
             All
           </button>
 
-          {categories.map((category) => (
+          {categories.filter(c => !c.isHidden).map((category) => (
             <button
               key={category.id}
               onClick={() => setActiveCategory(category.id)}
@@ -355,7 +355,7 @@ export default function CustomerMenuClient({ initialData, slug }) {
                   </div>
 
                   {hasDesc && (
-                    <p className="text-[11px] font-medium text-neutral-400 line-clamp-2 leading-relaxed pr-4 mb-2">
+                    <p className="text-[11px] font-medium text-neutral-400 leading-relaxed pr-4 mb-2 whitespace-pre-wrap">
                       {item.description}
                     </p>
                   )}

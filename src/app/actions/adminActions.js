@@ -46,6 +46,7 @@ export async function getCategories(cafeId) {
     .from("Category") 
     .select("*")
     .eq("cafeId", cafeId)
+    .order("sortOrder", { ascending: true })
     .order("createdAt", { ascending: true });
 
   if (error) {
@@ -55,8 +56,8 @@ export async function getCategories(cafeId) {
   return data || [];
 }
 
-export async function addCategory(cafeId, name) {
-  console.log("Adding category:", { cafeId, name });
+export async function addCategory(cafeId, name, sortOrder = 0, isHidden = false) {
+  console.log("Adding category:", { cafeId, name, sortOrder, isHidden });
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
@@ -65,6 +66,8 @@ export async function addCategory(cafeId, name) {
       {
         cafeId: cafeId,
         name: name,
+        sortOrder: sortOrder,
+        isHidden: isHidden,
         updatedAt: now,
       },
     ])
@@ -79,14 +82,16 @@ export async function addCategory(cafeId, name) {
 }
 
 // NEW: Update Category Core Action
-export async function updateCategory(id, name) {
-  console.log("Updating category:", { id, name });
+export async function updateCategory(id, name, sortOrder = 0, isHidden = false) {
+  console.log("Updating category:", { id, name, sortOrder, isHidden });
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
     .from("Category")
     .update({
       name: name,
+      sortOrder: sortOrder,
+      isHidden: isHidden,
       updatedAt: now
     })
     .eq("id", id)
@@ -119,6 +124,7 @@ export async function getMenuItems(cafeId) {
     .from("MenuItem")
     .select("*, Category(*)")
     .eq("cafeId", cafeId)
+    .order("sortOrder", { ascending: true })
     .order("createdAt", { ascending: false });
 
   if (error) {
@@ -165,6 +171,26 @@ export async function toggleItemStock(id, inStock) {
 
   if (error) {
     console.error("Toggle Stock Error:", error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+export async function toggleItemFavorite(id, isFavorite) {
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("MenuItem")
+    .update({
+      isFavorite: isFavorite,
+      updatedAt: now,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Toggle Favorite Error:", error);
     throw new Error(error.message);
   }
   return data;
