@@ -1,6 +1,24 @@
 import { getPublicMenuBySlug } from '../actions/adminActions';
 import CustomerMenuClient from './CustomerMenuClient';
 
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const data = await getPublicMenuBySlug(slug);
+  
+  if (!data || !data.cafe) {
+    return { title: 'Not Found | MenuHub' };
+  }
+  
+  return {
+    title: `${data.cafe.name} | Digital Menu`,
+    description: `Explore the digital menu for ${data.cafe.name}.`,
+    openGraph: {
+      title: `${data.cafe.name} - Digital Menu`,
+      description: `Explore the digital menu for ${data.cafe.name}.`,
+    }
+  };
+}
+
 export default async function CafeMenuPage({ params }) {
   const { slug } = await params;
   
