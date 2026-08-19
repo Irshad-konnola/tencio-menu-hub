@@ -13,7 +13,10 @@ export default function SettingsTab({
   downloadQR, 
   baseUrl, 
   cafeDetails, 
-  features 
+  features,
+  staffPasscode,
+  setStaffPasscode,
+  handleSaveStaffPasscode
 }) {
   const canUseTableService = features?.table_service?.enabled === true;
 
@@ -30,13 +33,26 @@ export default function SettingsTab({
         <p className="text-[12px] font-medium text-neutral-500 leading-relaxed">Allow customers to call a waiter directly from their table by scanning a unique QR code.</p>
       </div>
 
-      <div className="bg-white p-6 rounded-[24px] shadow-sm border border-neutral-100/50">
+      {/* <div className="bg-white p-6 rounded-[24px] shadow-sm border border-neutral-100/50">
         <div className="flex justify-between items-center mb-2">
           <div>
             <h3 className="font-bold text-[15px] text-[#111814]">Background Alerts</h3>
             <p className="text-[12px] font-medium text-neutral-500 mt-1 leading-relaxed">Receive waiter requests on your device even when this dashboard is closed.</p>
           </div>
           <button onClick={handleEnablePushNotifications} className="bg-[#1A1C19] hover:bg-black transition-colors text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-xl flex-shrink-0">Enable Alerts</button>
+        </div>
+      </div> */}
+
+      <div className="bg-white p-6 rounded-[24px] shadow-sm border border-neutral-100/50">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="font-bold text-[15px] text-[#111814]">Staff PIN</h3>
+            <p className="text-[12px] font-medium text-neutral-500 mt-1 leading-relaxed">Allow your staff to log in with this 4-digit PIN to toggle item availability, without granting full admin access.</p>
+          </div>
+        </div>
+        <div className="flex gap-4">
+          <input type="text" value={staffPasscode} onChange={(e) => { const val = e.target.value; if (/^\d{0,4}$/.test(val)) setStaffPasscode(val); }} placeholder="e.g. 1234" className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 text-[15px] font-medium text-black focus:outline-none focus:border-black tracking-widest" />
+          <button onClick={handleSaveStaffPasscode} disabled={staffPasscode && staffPasscode.length !== 4} className="bg-[#111814] text-white px-6 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-black transition-colors disabled:opacity-50">Save PIN</button>
         </div>
       </div>
 

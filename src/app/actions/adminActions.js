@@ -658,3 +658,25 @@ export async function updateTenantFeature(cafeId, featureKey, enabled, displayMo
   }
   return data;
 }
+export async function updateCafeStaffPasscode(cafeId, staffPasscode) {
+  const { data, error } = await supabase.from('Cafe').update({ staffPasscode }).eq('id', cafeId).select().single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function verifyStaffPasscode(email, passcode) {
+  if (!supabaseAdmin) throw new Error('SUPABASE_SERVICE_ROLE_KEY missing');
+  const { data: { users }, error: userError } = await supabaseAdmin.auth.admin.listUsers();
+  if (userError) throw new Error(userError.message);
+  const user = users.find(u => u.email === email);
+  if (!user) return { success: false, message: 'Invalid credentials' };
+  
+  const { data: cafe, error: cafeError } = await supabaseAdmin.from('Cafe').select('staffPasscode').eq('ownerId', user.id).single();
+  if (cafeError || !cafe) return { success: false, message: 'Invalid credentials' };
+  
+  if (cafe.staffPasscode === passcode && passcode) {
+    return { success: true };
+  }
+  return { success: false, message: 'Invalid Staff PIN' };
+}
+

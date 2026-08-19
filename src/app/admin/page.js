@@ -8,7 +8,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import {
   getCategories, addCategory, deleteCategory, updateCategory,
   getMenuItems, addMenuItem, toggleItemStock, deleteMenuItem,
-  uploadImage, updateMenuItem, updateCafeSettings,
+  uploadImage, updateMenuItem, updateCafeSettings, updateCafeStaffPasscode,
   getBanners, addBanner, deleteBanner, toggleCategoryHighlight,
   resolveServiceRequest, savePushSubscription, getCafeFeatures,
   toggleItemFavorite
@@ -205,11 +205,13 @@ export default function AdminPanel() {
   const router = useRouter();
   const [currentView, setCurrentView] = useState("DASHBOARD");
   const [dashboardTab, setDashboardTab] = useState("ITEMS");
+  const [isStaffMode, setIsStaffMode] = useState(false);
 
   const [cafeId, setCafeId] = useState(null);
   const [cafeDetails, setCafeDetails] = useState(null);
   const [hasTableService, setHasTableService] = useState(false);
   const [tableCount, setTableCount] = useState(10);
+  const [staffPasscode, setStaffPasscode] = useState("");
 
   const [banners, setBanners] = useState([]);
   const [showUpsellModal, setShowUpsellModal] = useState(false);
@@ -299,6 +301,7 @@ export default function AdminPanel() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) { router.push("/login"); return; }
+        setIsStaffMode(sessionStorage.getItem('dashboard_unlocked') === 'staff');
 
         const { data: cafes, error: cafeError } = await supabase.from("Cafe").select("*").eq("ownerId", session.user.id);
         if (cafeError || !cafes || cafes.length === 0) {
@@ -310,6 +313,7 @@ export default function AdminPanel() {
         setCafeId(cafeData.id);
         setCafeDetails(cafeData);
         setHasTableService(cafeData.hasTableService || false);
+        setStaffPasscode(cafeData.staffPasscode || "");
 
         const fetchedCategories = await getCategories(cafeData.id);
         const fetchedItems = await getMenuItems(cafeData.id);
@@ -361,6 +365,16 @@ export default function AdminPanel() {
     } catch {
       setHasTableService(hasTableService);
       alert("Failed to update settings.");
+    }
+  };
+
+  const handleSaveStaffPasscode = async () => {
+    if (!cafeId) return;
+    try {
+      await updateCafeStaffPasscode(cafeId, staffPasscode);
+      alert("Staff PIN updated successfully!");
+    } catch (err) {
+      alert("Failed to update Staff PIN: " + err.message);
     }
   };
 
@@ -575,10 +589,13 @@ export default function AdminPanel() {
                 </div>
                 <div className="flex gap-4 border-b border-neutral-200 overflow-x-auto hide-scrollbar">
                   {(() => {
-                    const tabs = ["ITEMS", "CATEGORIES"];
-                    if (features?.billing?.enabled || features?.billing?.displayMode === 'locked') tabs.push("BILLING");
-                    if (features?.banners?.enabled || features?.banners?.displayMode === 'locked') tabs.push("BANNERS");
-                    tabs.push("SETTINGS");
+                    let tabs = ["ITEMS"];
+                    if (!isStaffMode) {
+                      tabs.push("CATEGORIES");
+                      if (features?.billing?.enabled || features?.billing?.displayMode === 'locked') tabs.push("BILLING");
+                      if (features?.banners?.enabled || features?.banners?.displayMode === 'locked') tabs.push("BANNERS");
+                      tabs.push("SETTINGS");
+                    }
                     
                     const handleTabClick = (tab) => {
                       const keyMap = { BANNERS: 'banners', BILLING: 'billing' };
@@ -614,6 +631,7 @@ export default function AdminPanel() {
                     openEditForm={openEditForm} 
                     handleDeleteItem={handleDeleteItem} 
                     handleToggle={handleToggle} 
+                    isStaffMode={isStaffMode}
                   />
                 )}
 
@@ -647,6 +665,9 @@ export default function AdminPanel() {
                     baseUrl={baseUrl} 
                     cafeDetails={cafeDetails} 
                     features={features} 
+                    staffPasscode={staffPasscode}
+                    setStaffPasscode={setStaffPasscode}
+                    handleSaveStaffPasscode={handleSaveStaffPasscode}
                   />
                 )}
                 
@@ -660,7 +681,7 @@ export default function AdminPanel() {
                 )}
               </div>
 
-              {dashboardTab !== "SETTINGS" && dashboardTab !== "BANNERS" && dashboardTab !== "BILLING" && (
+              {!isStaffMode && dashboardTab !== "SETTINGS" && dashboardTab !== "BANNERS" && dashboardTab !== "BILLING" && (
                 <div className="absolute bottom-6 right-6 z-30">
                   <button onClick={() => {
                     if (dashboardTab === "ITEMS") {

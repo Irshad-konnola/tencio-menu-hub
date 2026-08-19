@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { verifyStaffPasscode } from '@/app/actions/adminActions';
 
 export default function LoginPage() {
   const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'passcode'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passcode, setPasscode] = useState('');
+  const [staffPasscode, setStaffPasscode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -41,7 +43,10 @@ export default function LoginPage() {
     if (loginMethod === 'passcode' && passcode.length === 4) {
       handlePasscodeLogin();
     }
-  }, [passcode, loginMethod]);
+    if (loginMethod === 'staff' && staffPasscode.length === 4) {
+      handleStaffLogin();
+    }
+  }, [passcode, staffPasscode, loginMethod]);
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
@@ -99,10 +104,44 @@ export default function LoginPage() {
     }
   };
 
+  const handleStaffLogin = async () => {
+    if (!email) {
+      setError('Please enter your email first.');
+      setStaffPasscode('');
+      return;
+    }
+    setError('');
+    setIsLoading(true);
+    try {
+      const res = await verifyStaffPasscode(email, staffPasscode);
+      if (res.success) {
+        localStorage.setItem('menuhub_email', email);
+        sessionStorage.setItem('dashboard_unlocked', 'staff');
+        router.push('/admin');
+      } else {
+        setError(res.message || 'Invalid Staff PIN.');
+        setStaffPasscode('');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Verification failed.');
+      setStaffPasscode('');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleNumberClick = (num) => {
-    if (passcode.length < 4) {
-      setPasscode(prev => prev + num);
-      setError('');
+    if (loginMethod === 'staff') {
+      if (staffPasscode.length < 4) {
+        setStaffPasscode(prev => prev + num);
+        setError('');
+      }
+    } else {
+      if (passcode.length < 4) {
+        setPasscode(prev => prev + num);
+        setError('');
+      }
     }
   };
 
@@ -116,31 +155,19 @@ export default function LoginPage() {
         <div className="mb-8 text-center">
           <h2 className="text-[10px] font-bold tracking-widest text-neutral-400 uppercase mb-2">MenuHub</h2>
           <h1 className="text-2xl font-bold tracking-tight text-[#111814]">
-            {loginMethod === 'passcode' ? 'Unlock Dashboard' : 'Admin Login'}
+            {loginMethod === 'password' ? 'Admin Login' : loginMethod === 'passcode' ? 'Quick Unlock' : 'Staff Login'}
           </h1>
         </div>
 
-        {/* The Toggle Switch */}
         <div className="flex bg-neutral-200 p-1 rounded-xl mb-8 relative">
-          <button
-            type="button"
-            onClick={() => { setLoginMethod('password'); setError(''); }}
-            className={`flex-1 py-2 text-xs font-bold z-10 transition-colors ${loginMethod === 'password' ? 'text-black' : 'text-neutral-500'}`}
-          >
-            Password
-          </button>
-          <button
-            type="button"
-            onClick={() => { setLoginMethod('passcode'); setError(''); setPasscode(''); }}
-            className={`flex-1 py-2 text-xs font-bold z-10 transition-colors ${loginMethod === 'passcode' ? 'text-black' : 'text-neutral-500'}`}
-          >
-            Quick PIN
-          </button>
+          <button type="button" onClick={() => { setLoginMethod('password'); setError(''); }} className={`flex-1 py-2 text-xs font-bold z-10 transition-colors ${loginMethod === 'password' ? 'text-black' : 'text-neutral-500'}`}>Admin</button>
+          <button type="button" onClick={() => { setLoginMethod('passcode'); setError(''); setPasscode(''); }} className={`flex-1 py-2 text-xs font-bold z-10 transition-colors ${loginMethod === 'passcode' ? 'text-black' : 'text-neutral-500'}`}>Quick PIN</button>
+          <button type="button" onClick={() => { setLoginMethod('staff'); setError(''); setStaffPasscode(''); }} className={`flex-1 py-2 text-xs font-bold z-10 transition-colors ${loginMethod === 'staff' ? 'text-black' : 'text-neutral-500'}`}>Staff PIN</button>
           <motion.div
             layout
-            className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-lg shadow-sm"
+            className="absolute top-1 bottom-1 w-[calc(33.33%-4px)] bg-white rounded-lg shadow-sm"
             initial={false}
-            animate={{ left: loginMethod === 'password' ? '4px' : 'calc(50% + 2px)' }}
+            animate={{ left: loginMethod === 'password' ? '4px' : loginMethod === 'passcode' ? 'calc(33.33% + 2px)' : 'calc(66.66% + 0px)' }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
           />
         </div>
@@ -153,8 +180,7 @@ export default function LoginPage() {
         )}
 
         <div className="space-y-6">
-          {/* Email input - hidden slightly during passcode if we want, but kept for clarity */}
-          <div className={loginMethod === 'passcode' ? 'opacity-50 pointer-events-none' : ''}>
+          <div className={loginMethod !== 'password' ? 'opacity-50 pointer-events-none' : ''}>
             <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Email Address</label>
             <input 
               type="email" 
@@ -162,7 +188,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@cafename.com" 
               className="w-full pb-2 border-b border-neutral-300 text-[15px] font-medium text-black focus:outline-none focus:border-black rounded-none bg-transparent transition-colors"
-              readOnly={loginMethod === 'passcode'}
+              readOnly={loginMethod !== 'password'}
             />
           </div>
 
@@ -209,16 +235,19 @@ export default function LoginPage() {
                 className="flex flex-col items-center"
               >
                 <div className="flex gap-4 mb-6 mt-2">
-                  {[0, 1, 2, 3].map((index) => (
-                    <motion.div 
-                      key={index}
-                      animate={{ 
-                        scale: passcode.length > index ? 1.2 : 1,
-                        backgroundColor: passcode.length > index ? '#111814' : '#E5E5E5'
-                      }}
-                      className="w-3 h-3 rounded-full transition-colors duration-200"
-                    />
-                  ))}
+                  {[0, 1, 2, 3].map((index) => {
+                    const currentLen = loginMethod === 'staff' ? staffPasscode.length : passcode.length;
+                    return (
+                      <motion.div 
+                        key={index}
+                        animate={{ 
+                          scale: currentLen > index ? 1.2 : 1,
+                          backgroundColor: currentLen > index ? '#111814' : '#E5E5E5'
+                        }}
+                        className="w-3 h-3 rounded-full transition-colors duration-200"
+                      />
+                    );
+                  })}
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 w-full">
@@ -246,8 +275,8 @@ export default function LoginPage() {
                   <div className="col-start-3">
                     <button
                       type="button"
-                      onClick={() => setPasscode(prev => prev.slice(0, -1))}
-                      disabled={isLoading || passcode.length === 0}
+                      onClick={() => loginMethod === 'staff' ? setStaffPasscode(prev => prev.slice(0, -1)) : setPasscode(prev => prev.slice(0, -1))}
+                      disabled={isLoading || (loginMethod === 'staff' ? staffPasscode.length === 0 : passcode.length === 0)}
                       className="h-12 w-full rounded-xl bg-transparent text-sm font-bold text-neutral-500 hover:text-[#111814] active:scale-95 transition-all flex justify-center items-center"
                     >
                       Delete
