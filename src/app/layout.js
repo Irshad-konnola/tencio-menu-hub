@@ -20,6 +20,14 @@ export const metadata = {
     description: "The ultimate digital menu and smart table service platform for modern cafes and restaurants.",
     url: "https://tencio-menu-hub.vercel.app",
     siteName: "Tencio Menu Hub",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Tencio Menu Hub",
+      },
+    ],
     locale: "en_US",
     type: "website",
   },
@@ -27,6 +35,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "Tencio Menu Hub",
     description: "Smart Digital Menus & Table Service platform.",
+    images: ["/og-image.png"],
   },
 };
 
