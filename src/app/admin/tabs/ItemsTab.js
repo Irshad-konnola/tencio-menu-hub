@@ -5,10 +5,37 @@ import { motion } from 'framer-motion';
 import ToggleSwitch from './ToggleSwitch'; // We need to extract this or put it in a common place
 
 export default function ItemsTab({ items, openEditForm, handleDeleteItem, handleToggle, isStaffMode }) {
+  const [sortNewestFirst, setSortNewestFirst] = React.useState(true);
+
+  const sortedItems = React.useMemo(() => {
+    return [...items].sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return sortNewestFirst ? dateB - dateA : dateA - dateB;
+    });
+  }, [items, sortNewestFirst]);
+
   return (
     <div className="space-y-4">
+      {items.length > 0 && (
+        <div className="flex justify-end px-1 mb-2">
+          <button 
+            onClick={() => setSortNewestFirst(!sortNewestFirst)}
+            className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest bg-white px-3 py-1.5 rounded-lg border border-neutral-200 text-neutral-500 shadow-sm hover:bg-neutral-50 hover:text-black transition-colors"
+          >
+            Sort: {sortNewestFirst ? 'Newest' : 'Oldest'}
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {sortNewestFirst ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+              )}
+            </svg>
+          </button>
+        </div>
+      )}
       {items.length === 0 && <p className="text-sm text-neutral-400 text-center pt-10">No items yet. Add one!</p>}
-      {items.map((item) => (
+      {sortedItems.map((item) => (
         <div key={item.id} className={`bg-white p-3.5 rounded-[18px] flex items-center gap-4 shadow-sm border border-neutral-100/50 transition-opacity ${!item.inStock ? "opacity-60" : ""}`}>
           <div className="w-12 h-12 bg-neutral-100 rounded-xl overflow-hidden flex-shrink-0">
             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
