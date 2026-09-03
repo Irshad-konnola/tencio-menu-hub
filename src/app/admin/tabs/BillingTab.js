@@ -14,6 +14,15 @@ export default function BillingTab({ items, cafeId, cafeDetails, handleToggleFav
   const [isGenerating, setIsGenerating] = useState(false);
   const [viewState, setViewState] = useState('BUILDER'); // BUILDER, HISTORY
   const [documentType, setDocumentType] = useState('invoice'); // invoice, quotation
+  const [sortNewestFirst, setSortNewestFirst] = useState(true);
+
+  const sortedItems = React.useMemo(() => {
+    return [...items].sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return sortNewestFirst ? dateB - dateA : dateA - dateB;
+    });
+  }, [items, sortNewestFirst]);
   
   const billRef = useRef(null);
 
@@ -160,15 +169,28 @@ export default function BillingTab({ items, cafeId, cafeDetails, handleToggleFav
             <div className="bg-white p-4 rounded-[16px] shadow-sm border border-neutral-100/50">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-400">Add Items</h3>
+                <button 
+                  onClick={() => setSortNewestFirst(!sortNewestFirst)}
+                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest bg-white px-2 py-1 rounded-lg border border-neutral-200 text-neutral-500 shadow-sm hover:bg-neutral-50 hover:text-black transition-colors"
+                >
+                  Sort: {sortNewestFirst ? 'Newest' : 'Oldest'}
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {sortNewestFirst ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                    )}
+                  </svg>
+                </button>
               </div>
               <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                 {/* Favorites Section */}
-                {items.some(i => i.isFavorite) && (
+                {sortedItems.some(i => i.isFavorite) && (
                   <div className="mb-4">
                     <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                       <span>★</span> Favorites
                     </div>
-                    {items.filter(i => i.isFavorite).map(item => {
+                    {sortedItems.filter(i => i.isFavorite).map(item => {
                       const isSelected = billItems.some(i => i.menuItemId === item.id);
                       return (
                         <div key={`fav-${item.id}`} className={`flex justify-between items-center p-2 rounded-lg transition-colors border mb-2 ${isSelected ? 'bg-green-50 border-green-200' : 'hover:bg-neutral-50 border-neutral-100'} last:border-0`}>
@@ -191,7 +213,7 @@ export default function BillingTab({ items, cafeId, cafeDetails, handleToggleFav
                 
                 {/* All Items */}
                 <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-2">All Menu Items</div>
-                {items.map(item => {
+                {sortedItems.map(item => {
                   const isSelected = billItems.some(i => i.menuItemId === item.id);
                   return (
                     <div key={item.id} className={`flex justify-between items-center p-2 rounded-lg transition-colors border mb-2 ${isSelected ? 'bg-green-50 border-green-200' : 'hover:bg-neutral-50 border-neutral-100'} last:border-0`}>
