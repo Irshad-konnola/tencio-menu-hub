@@ -21,7 +21,7 @@
 <!-- Tip: Drag and drop 2 screenshots directly into the GitHub README editor to replace these placeholders -->
 | Mobile QR Menu (Customer View) | Live Restaurant Admin & Table Alerts |
 | :---: | :---: |
-| <img width="844" height="660" alt="WhatsApp Image 2026-10-21 at 6 45 37 PM" src="https://github.com/user-attachments/assets/7ed2c987-b17c-4346-980a-48bd182a6c59" /> | <img width="846" height="660" alt="WhatsApp Image 2026-10-21 at 6 47 11 PM" src="https://github.com/user-attachments/assets/39de6ffa-c6ac-4728-811b-faae45a9d05b" /> |
+| <img width="600" height="800" alt="WhatsApp Image 2026-10-21 at 6 45 37 PM" src="https://github.com/user-attachments/assets/7ed2c987-b17c-4346-980a-48bd182a6c59" /> | <img width="600" height="800" alt="WhatsApp Image 2026-10-21 at 6 47 11 PM" src="https://github.com/user-attachments/assets/39de6ffa-c6ac-4728-811b-faae45a9d05b" /> |
 
 ---
 
