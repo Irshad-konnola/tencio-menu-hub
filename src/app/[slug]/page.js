@@ -30,7 +30,7 @@ export default async function CafeMenuPage({ params }) {
     return (
       <div className="min-h-screen bg-[#F9F9F9] flex flex-col items-center justify-center p-6 text-center">
         <h1 className="text-4xl font-bold text-[#111814] mb-4">404</h1>
-        <p className="text-neutral-500 font-medium">This menu doesn't exist.</p>
+        <p className="text-neutral-500 font-medium">This menu doesn&apos;t exist.</p>
       </div>
     );
   }

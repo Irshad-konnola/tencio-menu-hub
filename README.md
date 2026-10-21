@@ -29,17 +29,19 @@ Built with **Next.js 15**, **Supabase**, and **Tailwind CSS**, it features a rob
 
 ## 📦 Environment Variables
 
-To run this project locally, you will need to add the following variables to a `.env.local` file:
+Copy the provided `.env.example` template to `.env.local` and populate the values:
 
-```text
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-NEXT_PUBLIC_VAPID_PUBLIC_KEY=your_vapid_public_key
-VAPID_PRIVATE_KEY=your_vapid_private_key
-SUPERADMIN_EMAIL=your_super_admin_email
-SUPERADMIN_PASSWORD=your_super_admin_password
+```bash
+cp .env.example .env.local
 ```
+
+Key variables required:
+* **Supabase:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+* **Direct Database (Optional):** `DATABASE_URL`, `DIRECT_URL`
+* **Web Push (VAPID):** `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`
+* **Super Admin:** `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`
+
+See [`.env.example`](.env.example) for detailed comments on each variable.
 
 ## 🚀 Getting Started
 
@@ -54,22 +56,32 @@ SUPERADMIN_PASSWORD=your_super_admin_password
    npm install
 ```
 
-3. **Generate VAPID Keys (if starting fresh):**
+3. **Configure environment:**
+```bash
+   cp .env.example .env.local
+```
+
+4. **Generate VAPID Keys (if starting fresh):**
 ```bash
    npx web-push generate-vapid-keys
 ```
    *(Add these to your `.env.local` file)*
 
-4. **Run the development server:**
+5. **Run the development server:**
 ```bash
    npm run dev
 ```
    Open http://localhost:3000 with your browser to see the result.
 
-## 🗄️ Database Schema
+## 🗄️ Database Schema & Migrations
 
-This project relies on a secure PostgreSQL database with Row Level Security (RLS) enabled. Core tables include:
+This project relies on a secure PostgreSQL database with Row Level Security (RLS) enabled. Structured SQL migrations are located in the [`supabase/migrations/`](supabase/migrations/) directory:
 
+* `01_features_and_billing.sql`: Cafe features flag system, billing tables, RLS policies, and superadmin session.
+* `02_bill_and_category_updates.sql`: Quotations support, favorite items, and category visibility toggles.
+* `03_staff_passcode.sql`: 4-digit staff passcode authentication column.
+
+Core tables include:
 * **Cafe:** Stores cafe details, branding, staff passcode, and owner association.
 * **CafeFeatures:** Tracks enabled/locked SaaS modules (Billing, Banners, Table Service) per tenant.
 * **Category & MenuItem:** Relational tables for menu management with visibility/stock toggles.

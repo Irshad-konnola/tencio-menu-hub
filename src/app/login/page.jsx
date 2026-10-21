@@ -38,16 +38,6 @@ export default function LoginPage() {
     initializeAuth();
   }, []);
 
-  // Auto-submit when passcode reaches 4 digits
-  useEffect(() => {
-    if (loginMethod === 'passcode' && passcode.length === 4) {
-      handlePasscodeLogin();
-    }
-    if (loginMethod === 'staff' && staffPasscode.length === 4) {
-      handleStaffLogin();
-    }
-  }, [passcode, staffPasscode, loginMethod]);
-
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     setError('');
@@ -69,7 +59,7 @@ export default function LoginPage() {
     }
   };
 
-  const handlePasscodeLogin = async () => {
+  const handlePasscodeLogin = React.useCallback(async () => {
     if (!email) {
       setError('Please enter your email first.');
       setPasscode('');
@@ -102,9 +92,9 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [email, passcode, router]);
 
-  const handleStaffLogin = async () => {
+  const handleStaffLogin = React.useCallback(async () => {
     if (!email) {
       setError('Please enter your email first.');
       setStaffPasscode('');
@@ -129,7 +119,25 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [email, staffPasscode, router]);
+
+  // Auto-submit when passcode reaches 4 digits
+  useEffect(() => {
+    let timer;
+    if (loginMethod === 'passcode' && passcode.length === 4) {
+      timer = setTimeout(() => {
+        handlePasscodeLogin();
+      }, 0);
+    }
+    if (loginMethod === 'staff' && staffPasscode.length === 4) {
+      timer = setTimeout(() => {
+        handleStaffLogin();
+      }, 0);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [passcode, staffPasscode, loginMethod, handlePasscodeLogin, handleStaffLogin]);
 
   const handleNumberClick = (num) => {
     if (loginMethod === 'staff') {
