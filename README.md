@@ -1,97 +1,99 @@
 <div align="center">
-  <img src="https://tencio-menu-hub.vercel.app/og-image.png" alt="Tencio Menu Hub" width="100%" />
+
+# 🍽️ Tencio Menu Hub — Real-Time QR Digital Menu & Restaurant SaaS
+
+**A multi-tenant restaurant ordering and table-service SaaS powered by Next.js 15, Supabase Realtime WebSockets, and native Web Push waiter alerts.**
+
+[![Next.js 15](https://img.shields.io/badge/Next.js_15-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Web Push](https://img.shields.io/badge/Web_Push_API-FF6B6B?style=for-the-badge&logo=googlechrome&logoColor=white)](#)
+
+[Key Features](#key-features) • [System Architecture](#system-architecture) • [Tech Stack](#tech-stack) • [Local Setup](#getting-started-local-development)
+
 </div>
 
-# 🍽️ Tencio Menu Hub (Multi-Tenant Restaurant SaaS)
+---
 
-Tencio Menu Hub is a high-performance, real-time digital menu, billing, and table service platform built for modern cafes and restaurants. Operating as a Multi-Tenant SaaS platform, it empowers cafe owners to manage their menus, generate table-specific QR codes, generate PDF quotations, and receive real-time waiter requests via background OS notifications.
+## 📸 Product Preview
 
-Built with **Next.js 15**, **Supabase**, and **Tailwind CSS**, it features a robust split architecture: a highly interactive Admin Dashboard, a secure Super Admin control panel, and a Server-Side Rendered (SSR), lightning-fast Customer Menu.
+<!-- Tip: Drag and drop 2 screenshots directly into the GitHub README editor to replace these placeholders -->
+| Mobile QR Menu (Customer View) | Live Restaurant Admin & Table Alerts |
+| :---: | :---: |
+| ![QR Menu Preview](<img width="844" height="1601" alt="WhatsApp Image 2026-10-21 at 6 45 37 PM" src="https://github.com/user-attachments/assets/7ed2c987-b17c-4346-980a-48bd182a6c59" />
+) | ![Admin Dashboard](<img width="846" height="1601" alt="WhatsApp Image 2026-10-21 at 6 47 11 PM" src="https://github.com/user-attachments/assets/39de6ffa-c6ac-4728-811b-faae45a9d05b" />
+) |
+
+---
+
+## 💡 The Problem & Solution
+
+Restaurants and cafes often rely on static PDF QR menus that take seconds to download on mobile networks, cannot reflect sold-out items in real time, and offer no way for diners to signal table service without flagging down staff.
+
+**Tencio Menu Hub** replaces static PDFs with an interactive, cloud-synced dining experience:
+- **Instant Server-Side Rendering (SSR):** Engineered with Next.js 15 Server Components so table QR scans render the interactive menu immediately, even on slow mobile data connections.
+- **Zero-Refresh Live Sync:** Uses **Supabase Realtime (WebSockets)** so when a kitchen marks an item "Sold Out" or updates a price, every active diner's screen updates instantly without a page reload.
+- **Native Background Waiter Alerts:** Implements Service Workers and the **Web Push API** to dispatch instant table-call and bill-request notifications directly to staff devices, even when the browser tab is backgrounded.
+
+---
 
 ## ✨ Key Features
 
-* **🏢 Multi-Tenant Architecture & Super Admin:** Run multiple distinct cafes from a single platform. A dedicated Super Admin dashboard allows platform owners to toggle features (Billing, Table Service, Banners) on a per-tenant basis.
-* **🚀 Zero-Second Load Times (SSR):** Customer menus are pre-fetched on the server (Next.js App Router) for instant loading, avoiding frontend loading spinners.
-* **⚡ Real-Time Database Sync:** Powered by Supabase WebSockets. If an admin marks an item as "Out of Stock," it instantly turns gray on every customer's phone without a page refresh.
-* **🧾 Invoicing & Quotations (Billing Module):** Integrated POS-style billing system. Easily build a cart, mark favorite items, and instantly download formatted Invoices or Quotations as high-quality images/PDFs.
-* **👥 Restricted Staff Mode:** Cafe owners can generate a custom 4-digit Staff PIN. Staff logging in with this PIN get a restricted view that only allows them to toggle items In-Stock/Out-of-Stock without accessing financial data or settings.
-* **🔔 Native Background Notifications:** Utilizes Service Workers and the Web Push API. Cafe owners receive OS-level "Ding!" notifications for table service requests, even if the browser tab is closed.
-* **📱 Premium Mobile-First UI:** Smooth animations using **Framer Motion** and an auto-playing swipeable promo banner using **Embla Carousel**.
-* **🖨️ Smart QR Engine:** Dynamically generates both Global Store QR codes and Table-Specific QR codes that owners can download as PNGs in one click.
+- **⚡ Real-Time WebSocket Menu Sync:** Instant bi-directional updates for item availability, dynamic pricing, and daily specials across all connected customer sessions.
+- **🔔 Native Web Push Table Service:** One-tap "Call Waiter" and "Request Bill" actions per table QR code using VAPID-authenticated background push notifications.
+- **🏢 Multi-Tenant SaaS & Tiered Subscriptions:** Role-based tenant isolation allowing multiple restaurants and branches to manage categories, modifiers, and branding independently.
+- **📱 Mobile-First Micro-Interactions:** App-like category filtering, smooth bottom-sheet item drawers, and dietary/spice-level badges tailored for mobile browsers.
+
+---
 
 ## 🛠️ Tech Stack
 
-* **Frontend:** React, Next.js 15 (App Router), Tailwind CSS, Framer Motion
-* **Backend:** Supabase (PostgreSQL, Realtime Engine, Storage Buckets, Row Level Security)
-* **Notifications:** Web Push API, Service Workers (`sw.js`)
-* **Deployment:** Vercel (Edge Network)
-* **Images:** `html-to-image` for instant POS receipt generation.
+| Layer | Technologies Used |
+| :--- | :--- |
+| **Framework & UI** | Next.js 15 (App Router & SSR), React, TypeScript, Tailwind CSS |
+| **Realtime & Database** | Supabase, PostgreSQL (Row-Level Security), Supabase Realtime WebSockets |
+| **Notifications & PWA** | Service Workers, Web Push API (VAPID Keys) |
+| **Deployment** | Vercel |
 
-## 📦 Environment Variables
+---
 
-Copy the provided `.env.example` template to `.env.local` and populate the values:
+## 🚀 Getting Started (Local Development)
 
+### 1. Clone the repository
+```bash
+git clone [https://github.com/Irshad-konnola/tencio-menu-hub.git](https://github.com/Irshad-konnola/tencio-menu-hub.git)
+cd tencio-menu-hub
+```
+
+### 2. Install dependencies
+```bash
+npm install
+```
+
+### 3. Configure Environment Variables
+Create a `.env.local` file in the root directory:
 ```bash
 cp .env.example .env.local
 ```
 
-Key variables required:
-* **Supabase:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-* **Direct Database (Optional):** `DATABASE_URL`, `DIRECT_URL`
-* **Web Push (VAPID):** `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`
-* **Super Admin:** `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`
+Add your Supabase and Web Push VAPID credentials:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
-See [`.env.example`](.env.example) for detailed comments on each variable.
-
-## 🚀 Getting Started
-
-1. **Clone the repository:**
-```bash
-   git clone https://github.com/Irshad-konnola/tencio-menu-hub.git
-   cd tencio-menu-hub
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=your_vapid_public_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
 ```
 
-2. **Install dependencies:**
+### 4. Run the development server
 ```bash
-   npm install
+npm run dev
 ```
+Open `http://localhost:3000` in your browser.
 
-3. **Configure environment:**
-```bash
-   cp .env.example .env.local
-```
+---
 
-4. **Generate VAPID Keys (if starting fresh):**
-```bash
-   npx web-push generate-vapid-keys
-```
-   *(Add these to your `.env.local` file)*
-
-5. **Run the development server:**
-```bash
-   npm run dev
-```
-   Open http://localhost:3000 with your browser to see the result.
-
-## 🗄️ Database Schema & Migrations
-
-This project relies on a secure PostgreSQL database with Row Level Security (RLS) enabled. Structured SQL migrations are located in the [`supabase/migrations/`](supabase/migrations/) directory:
-
-* `01_features_and_billing.sql`: Cafe features flag system, billing tables, RLS policies, and superadmin session.
-* `02_bill_and_category_updates.sql`: Quotations support, favorite items, and category visibility toggles.
-* `03_staff_passcode.sql`: 4-digit staff passcode authentication column.
-
-Core tables include:
-* **Cafe:** Stores cafe details, branding, staff passcode, and owner association.
-* **CafeFeatures:** Tracks enabled/locked SaaS modules (Billing, Banners, Table Service) per tenant.
-* **Category & MenuItem:** Relational tables for menu management with visibility/stock toggles.
-* **ServiceRequest:** Handles real-time waiter calls.
-* **Bill:** Stores transaction histories (Invoices & Quotations).
-* **PushSubscriptions:** Stores device-specific endpoints for background alerts.
-
-## 🔒 Security
-
-* **Row Level Security (RLS):** Every database read/write is isolated. Tenants can only see their own menus and financial data.
-* **Staff Access Control:** Front-end routing blocks Staff Mode users from accessing features outside the `ItemsTab`.
-* **Strict Deduplication:** Frontend state and backend insertion logic ensures duplicate menu items and push subscriptions are automatically filtered out.
-* **1MB File Limit:** Admin image uploads are strictly gated to preserve storage and bandwidth.
+## 📄 License
+Distributed under the MIT License. Built by [Irshad Konnola](https://irshadkonnola.vercel.app/) at [Tencio](https://tencio.vercel.app/).
