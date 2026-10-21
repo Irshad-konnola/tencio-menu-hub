@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function AdminLayout({ children }) {
@@ -16,7 +16,9 @@ export default function AdminLayout({ children }) {
       router.replace('/login');
     } else {
       // 3. Badge found! Allow them to see the dashboard
-      setIsAuthorized(true);
+      React.startTransition(() => {
+        setIsAuthorized(true);
+      });
     }
   }, [router]);
 

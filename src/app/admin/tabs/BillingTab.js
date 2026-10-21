@@ -4,6 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createBill, getBills, deleteBill } from '@/app/actions/adminActions';
 import * as htmlToImage from 'html-to-image';
 
+function generateBillFilename() {
+  return `bill-${Date.now()}.png`;
+}
+
 export default function BillingTab({ items, cafeId, cafeDetails, handleToggleFavorite }) {
   const [bills, setBills] = useState([]);
   const [billItems, setBillItems] = useState([]);
@@ -26,20 +30,23 @@ export default function BillingTab({ items, cafeId, cafeDetails, handleToggleFav
   
   const billRef = useRef(null);
 
-  useEffect(() => {
-    if (viewState === 'HISTORY') {
-      loadBills();
-    }
-  }, [viewState]);
-
-  const loadBills = async () => {
+  const loadBills = React.useCallback(async () => {
     try {
       const data = await getBills(cafeId);
       setBills(data);
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [cafeId]);
+
+  useEffect(() => {
+    if (viewState === 'HISTORY') {
+      const timer = setTimeout(() => {
+        loadBills();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [viewState, loadBills]);
 
   const addItemToBill = (item) => {
     const existingItemIndex = billItems.findIndex(i => i.menuItemId === item.id);
@@ -118,7 +125,7 @@ export default function BillingTab({ items, cafeId, cafeDetails, handleToggleFav
         // Fallback for non-supporting browsers (e.g., Desktop Chrome to WA Web)
         const downloadLink = document.createElement("a");
         downloadLink.href = dataUrl;
-        downloadLink.download = `bill-${Date.now()}.png`;
+        downloadLink.download = generateBillFilename();
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
