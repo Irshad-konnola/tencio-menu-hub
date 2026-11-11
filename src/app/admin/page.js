@@ -120,7 +120,7 @@ const CategoryModal = ({ isOpen, onClose, newCategory, setNewCategory, onSave, i
 );
 
 const ItemForm = ({ editingId, isSaving, newItem, setNewItem, categories, formError, setFormError, imageFile, setImageFile, onCancel, onSave, features = {}, cafeDetails = null }) => {
-  const showUnits = features?.item_units?.enabled === true || cafeDetails?.slug === 'kolarkitchen' || !!newItem.unit;
+  const showUnits = features?.item_units?.enabled === true || cafeDetails?.slug?.includes('kolar') || !!newItem.unit;
   const handleFileChange = (e) => {
     setFormError("");
     const file = e.target.files[0];
