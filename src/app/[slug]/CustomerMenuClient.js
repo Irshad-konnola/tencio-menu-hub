@@ -348,9 +348,16 @@ export default function CustomerMenuClient({ initialData, slug }) {
                       )}
                     </div>
                     <div className="flex-shrink-0 text-right mt-[-2px]">
-                      <span className="font-extrabold text-[16px] text-[#1A1C19] tracking-tight">
-                        ₹{item.price}
-                      </span>
+                      <div className="flex items-baseline justify-end gap-1 whitespace-nowrap">
+                        <span className="font-extrabold text-[16px] text-[#1A1C19] tracking-tight">
+                          ₹{item.price}
+                        </span>
+                        {item.unit && (
+                          <span className="text-[11px] font-bold text-neutral-500">
+                            {item.unit.startsWith('/') ? item.unit : `/ ${item.unit}`}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 

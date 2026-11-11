@@ -20,6 +20,10 @@ This directory contains the database schema migrations for Tencio Menu Hub.
 3. **`03_staff_passcode.sql`**
    - Adds `staffPasscode` column to `Cafe` for restricted staff access.
 
+4. **`04_item_units.sql`**
+   - Adds `unit` column to `MenuItem` for portion/unit pricing (e.g., '1 kg', 'Half kg', 'Plate').
+   - Seeds `item_units` feature flag into `CafeFeatures` (enabled by default for `kolarkitchen`).
+
 ## Applying Migrations
 
 You can apply these migrations using either:
