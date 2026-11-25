@@ -45,7 +45,7 @@ export default function ItemsTab({ items, openEditForm, handleDeleteItem, handle
             {item.malayalamName && (
               <p className="text-[12px] font-medium text-neutral-500 mb-0.5 truncate">{item.malayalamName}</p>
             )}
-            <p className="text-[12px] font-semibold text-neutral-500">₹{item.price} • {item.Category?.name || item.category?.name || "Uncategorized"}</p>
+            <p className="text-[12px] font-semibold text-neutral-500">₹{item.price}{item.unit ? ` / ${item.unit}` : ''} • {item.Category?.name || item.category?.name || "Uncategorized"}</p>
           </div>
           <div className="flex items-center gap-3">
             {!isStaffMode && (

@@ -7,7 +7,9 @@ const featuresList = [
   { key: 'table_service', label: 'Smart Table Service' },
   { key: 'banners', label: 'Banners' },
   { key: 'category_highlight', label: 'Category Highlight' },
-  { key: 'billing', label: 'Billing Module' }
+  { key: 'billing', label: 'Billing Module' },
+  { key: 'item_units', label: 'Unit / Portion Pricing' },
+  { key: 'catering_menu', label: 'Shareable Catering Menu' }
 ];
 
 export default function SuperAdminClient({ initialTenants }) {

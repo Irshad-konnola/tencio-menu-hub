@@ -3,6 +3,7 @@
 import React from 'react';
 import ToggleSwitch from './ToggleSwitch';
 import { QRCodeCanvas } from 'qrcode.react';
+import CateringSettings from './CateringSettings';
 
 export default function SettingsTab({ 
   hasTableService, 
@@ -16,12 +17,16 @@ export default function SettingsTab({
   features,
   staffPasscode,
   setStaffPasscode,
-  handleSaveStaffPasscode
+  handleSaveStaffPasscode,
+  onCateringContactSaved
 }) {
   const canUseTableService = features?.table_service?.enabled === true;
 
   return (
     <div className="space-y-8">
+      {features?.catering_menu?.enabled === true && baseUrl && (
+        <CateringSettings cafeDetails={cafeDetails} baseUrl={baseUrl} downloadQR={downloadQR} onContactSaved={onCateringContactSaved} />
+      )}
       <div className="bg-white p-6 rounded-[24px] shadow-sm border border-neutral-100/50">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">

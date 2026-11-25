@@ -6,7 +6,10 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test tests/*.test.mjs",
+    "preview:catering": "node scripts/catering-preview.mjs",
+    "test:routes": "node --test tests/routes.smoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",

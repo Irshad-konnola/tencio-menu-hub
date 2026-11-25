@@ -119,7 +119,8 @@ const CategoryModal = ({ isOpen, onClose, newCategory, setNewCategory, onSave, i
   </AnimatePresence>
 );
 
-const ItemForm = ({ editingId, isSaving, newItem, setNewItem, categories, formError, setFormError, imageFile, setImageFile, onCancel, onSave }) => {
+const ItemForm = ({ editingId, isSaving, newItem, setNewItem, categories, formError, setFormError, imageFile, setImageFile, onCancel, onSave, features = {}, cafeDetails = null }) => {
+  const showUnits = features?.item_units?.enabled === true || cafeDetails?.slug?.includes('kolar') || !!newItem.unit;
   const handleFileChange = (e) => {
     setFormError("");
     const file = e.target.files[0];
@@ -171,11 +172,45 @@ const ItemForm = ({ editingId, isSaving, newItem, setNewItem, categories, formEr
                 {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
               </select>
             </div>
-            <div className="w-1/3">
+            <div className={showUnits ? "w-28" : "w-1/3"}>
               <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Price (₹)</label>
               <input type="number" value={newItem.price} onChange={(e) => setNewItem({ ...newItem, price: e.target.value })} placeholder="0.00" className="w-full pb-2 border-b border-neutral-200 text-[15px] font-medium text-black focus:outline-none focus:border-black rounded-none" />
             </div>
+            {showUnits && (
+              <div className="w-28">
+                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Unit</label>
+                <input type="text" value={newItem.unit || ""} onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })} placeholder="e.g. 1 kg" className="w-full pb-2 border-b border-neutral-200 text-[15px] font-medium text-black focus:outline-none focus:border-black rounded-none" />
+              </div>
+            )}
           </div>
+          {showUnits && (
+            <div className="-mt-3 flex flex-wrap gap-1.5 items-center">
+              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mr-1">Quick pick:</span>
+              {["1 kg", "Half kg", "Plate", "Portion", "1 Pc"].map((preset) => (
+                <button
+                  type="button"
+                  key={preset}
+                  onClick={() => setNewItem({ ...newItem, unit: preset })}
+                  className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold transition-colors ${
+                    newItem.unit === preset
+                      ? "bg-[#111814] text-white"
+                      : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+              {newItem.unit && (
+                <button
+                  type="button"
+                  onClick={() => setNewItem({ ...newItem, unit: "" })}
+                  className="text-[10px] text-neutral-400 hover:text-red-500 underline ml-1"
+                >
+                  clear
+                </button>
+              )}
+            </div>
+          )}
           <div>
             <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2">Description</label>
             <textarea rows="3" value={newItem.description} onChange={(e) => setNewItem({ ...newItem, description: e.target.value })} placeholder="Enter brief description..." className="w-full pt-2 pb-2 border-b border-neutral-200 text-[14px] font-medium text-black focus:outline-none focus:border-black rounded-none resize-none" />
@@ -229,7 +264,7 @@ export default function AdminPanel() {
   const [editingId, setEditingId] = useState(null);
   const [formError, setFormError] = useState("");
   const [imageFile, setImageFile] = useState(null);
-  const [newItem, setNewItem] = useState({ name: "", malayalamName: "", price: "", categoryId: "", description: "", sortOrder: 0, isFavorite: false, imageUrl: DEFAULT_IMAGE });
+  const [newItem, setNewItem] = useState({ name: "", malayalamName: "", price: "", unit: "", categoryId: "", description: "", sortOrder: 0, isFavorite: false, imageUrl: DEFAULT_IMAGE });
   const [isSaving, setIsSaving] = useState(false);
   const [features, setFeatures] = useState({});
   const [liveRequests, setLiveRequests] = useState([]);
@@ -499,13 +534,13 @@ export default function AdminPanel() {
 
   const openEditForm = (item) => {
     setEditingId(item.id);
-    setNewItem({ name: item.name, malayalamName: item.malayalamName || "", price: item.price, categoryId: item.categoryId, description: item.description || "", sortOrder: item.sortOrder || 0, isFavorite: item.isFavorite || false, imageUrl: item.imageUrl || DEFAULT_IMAGE });
+    setNewItem({ name: item.name, malayalamName: item.malayalamName || "", price: item.price, unit: item.unit || "", categoryId: item.categoryId, description: item.description || "", sortOrder: item.sortOrder || 0, isFavorite: item.isFavorite || false, imageUrl: item.imageUrl || DEFAULT_IMAGE });
     setImageFile(null); setFormError(""); setCurrentView("ITEM_FORM");
   };
 
   const openCreateForm = () => {
     setEditingId(null);
-    setNewItem({ name: "", malayalamName: "", price: "", categoryId: "", description: "", sortOrder: 0, isFavorite: false, imageUrl: DEFAULT_IMAGE });
+    setNewItem({ name: "", malayalamName: "", price: "", unit: "", categoryId: "", description: "", sortOrder: 0, isFavorite: false, imageUrl: DEFAULT_IMAGE });
     setImageFile(null); setFormError(""); setCurrentView("ITEM_FORM");
   };
 
@@ -522,7 +557,7 @@ export default function AdminPanel() {
         finalImageUrl = await uploadImage(formData);
       }
 
-      const payload = { ...newItem, price: parseFloat(newItem.price), cafeId, imageUrl: finalImageUrl };
+      const payload = { ...newItem, unit: newItem.unit?.trim() || null, price: parseFloat(newItem.price), cafeId, imageUrl: finalImageUrl };
 
       if (editingId) {
         const savedItem = await updateMenuItem(editingId, payload);
@@ -668,6 +703,7 @@ export default function AdminPanel() {
                     staffPasscode={staffPasscode}
                     setStaffPasscode={setStaffPasscode}
                     handleSaveStaffPasscode={handleSaveStaffPasscode}
+                    onCateringContactSaved={number => setCafeDetails(current => ({ ...current, cateringWhatsappNumber: number }))}
                   />
                 )}
                 
@@ -703,6 +739,8 @@ export default function AdminPanel() {
               categories={categories} formError={formError} setFormError={setFormError}
               imageFile={imageFile} setImageFile={setImageFile} onCancel={() => setCurrentView("DASHBOARD")}
               onSave={async () => { setIsSaving(true); await handleSaveItem(); setIsSaving(false); }}
+              features={features}
+              cafeDetails={cafeDetails}
             />
           )}
         </AnimatePresence>
