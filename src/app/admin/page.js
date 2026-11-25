@@ -703,6 +703,7 @@ export default function AdminPanel() {
                     staffPasscode={staffPasscode}
                     setStaffPasscode={setStaffPasscode}
                     handleSaveStaffPasscode={handleSaveStaffPasscode}
+                    onCateringContactSaved={number => setCafeDetails(current => ({ ...current, cateringWhatsappNumber: number }))}
                   />
                 )}
                 

@@ -2,6 +2,10 @@
 
 import { supabase } from "@/lib/supabase";
 import webpush from "web-push";
+import { cache } from 'react';
+import { FEATURE_KEYS } from '@/lib/menu.mjs';
+import { fetchPublicMenu } from '@/lib/publicMenu.mjs';
+import { saveCateringContact } from '@/lib/cateringSettings.mjs';
 
 const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
@@ -277,50 +281,15 @@ export async function updateCafeSettings(cafeId, hasTableService) {
 // --- PUBLIC FACING ACTIONS ---
 // ------------------------------------------------------------------
 
-export async function getPublicMenuBySlug(slug) {
-  const { data: cafe, error: cafeError } = await supabase
-    .from("Cafe")
-    .select("id, name, slug, hasTableService, serviceType") 
-    .eq("slug", slug)
-    .single();
+// React cache deduplicates metadata/page reads only within the current render.
+const loadPublicMenu = cache((slug, mode) => fetchPublicMenu(supabaseAdmin || supabase, slug, mode));
 
-  if (cafeError || !cafe) return null;
+export async function getPublicMenuBySlug(slug, mode = 'outlet') {
+  return loadPublicMenu(slug, mode);
+}
 
-  const { data: featureRows } = await supabase
-    .from("CafeFeatures")
-    .select("*")
-    .eq("cafeId", cafe.id);
-    
-  const features = {};
-  if (featureRows) {
-    featureRows.forEach(f => {
-      features[f.featureKey] = { enabled: f.enabled, displayMode: f.displayMode };
-    });
-  }
-
-  const { data: categories } = await supabase
-    .from("Category")
-    .select("*")
-    .eq("cafeId", cafe.id)
-    .order("createdAt", { ascending: true });
-
-  const { data: items } = await supabase
-    .from("MenuItem")
-    .select(`*, Category(name)`)
-    .eq("cafeId", cafe.id)
-    .order("createdAt", { ascending: false });
-
-  let banners = [];
-  if (features.banners?.enabled) {
-    const { data: bannerData } = await supabase
-      .from("CafeBanner")
-      .select("*")
-      .eq("cafeId", cafe.id)
-      .order("sortOrder", { ascending: true });
-    banners = bannerData || [];
-  }
-
-  return { cafe, features, categories: categories || [], items: items || [], banners };
+export async function updateCateringContact(cafeId, number, accessToken) {
+  return saveCateringContact(supabaseAdmin, cafeId, number, accessToken);
 }
 
 export async function createServiceRequest(cafeId, tableNumber) {
@@ -441,9 +410,9 @@ export async function deleteBanner(bannerId) {
 // ------------------------------------------------------------------
 
 export async function getCafeFeatures(cafeId) {
-  const { data, error } = await supabase
+  const { data, error } = await (supabaseAdmin || supabase)
     .from("CafeFeatures")
-    .select("*")
+    .select("featureKey, enabled, displayMode")
     .eq("cafeId", cafeId);
     
   if (error) {
@@ -594,6 +563,7 @@ export async function superAdminLogout() {
 }
 
 export async function getAllTenantsWithFeatures() {
+  if (!await verifySuperAdminSession()) throw new Error('Unauthorized. Please sign in as Super Admin.');
   if (!supabaseAdmin) throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing in .env");
 
   // Join Cafe with CafeFeatures
@@ -620,7 +590,7 @@ export async function getAllTenantsWithFeatures() {
     const cafeFeats = features.filter(f => f.cafeId === cafe.id);
     const featureMap = {};
     // ensure canonical keys exist even if not seeded properly yet
-    const canonicalKeys = ['billing', 'table_service', 'banners', 'category_highlight'];
+    const canonicalKeys = FEATURE_KEYS;
     
     canonicalKeys.forEach(key => {
       const feat = cafeFeats.find(f => f.featureKey === key);
@@ -641,6 +611,10 @@ export async function getAllTenantsWithFeatures() {
 }
 
 export async function updateTenantFeature(cafeId, featureKey, enabled, displayMode) {
+  if (!await verifySuperAdminSession()) throw new Error('Unauthorized. Please sign in as Super Admin.');
+  if (!FEATURE_KEYS.includes(featureKey) || typeof enabled !== 'boolean' || !['hidden', 'locked'].includes(displayMode)) {
+    throw new Error('Invalid feature settings.');
+  }
   if (!supabaseAdmin) throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing in .env");
 
   const { data, error } = await supabaseAdmin

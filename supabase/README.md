@@ -24,7 +24,17 @@ This directory contains the database schema migrations for Tencio Menu Hub.
    - Adds `unit` column to `MenuItem` for portion/unit pricing (e.g., '1 kg', 'Half kg', 'Plate').
    - Seeds `item_units` feature flag into `CafeFeatures` (enabled by default for `kolarkitchen`).
 
+5. **`05_catering_menu.sql`**
+   - Adds the optional `Cafe.cateringWhatsappNumber` contact setting.
+   - Enables `catering_menu` for `kolar-kitchen` / `kolarkitchen`; other existing cafes remain disabled.
+   - Seeds Kolar Kitchen's supplied enquiry number, `+91 8075603490`, on initial setup.
+   - Can be run again without resetting feature choices or contact edits.
+
 ## Applying Migrations
+
+Apply migration 05 before enabling catering on a tenant. The existing outlet routes
+continue working before it is applied. This repository change does not itself run
+SQL against the live database.
 
 You can apply these migrations using either:
 - **Supabase Dashboard**: Copy and paste the contents into the **SQL Editor** in sequential order.

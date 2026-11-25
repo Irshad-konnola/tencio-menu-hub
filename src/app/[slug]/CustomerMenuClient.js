@@ -3,14 +3,17 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
-import { createServiceRequest } from "../actions/adminActions";
+import { createServiceRequest, getPublicMenuBySlug } from "../actions/adminActions";
 import { supabase } from "@/lib/supabase";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
+import { selectMenuItems, isCateringEnabled, buildCateringEnquiryUrl } from '@/lib/menu.mjs';
+import MenuShareActions from '@/app/components/MenuShareActions';
 
-export default function CustomerMenuClient({ initialData, slug }) {
+export default function CustomerMenuClient({ initialData, slug, mode = 'outlet' }) {
+  const isCatering = mode === 'catering';
   const searchParams = useSearchParams();
-  const tableNumber = searchParams.get("table");
+  const tableNumber = isCatering ? null : searchParams.get("table");
 
   // We start immediately with the data the server gave us! No loading screens!
   const [cafe, setCafe] = useState(initialData.cafe);
@@ -18,6 +21,9 @@ export default function CustomerMenuClient({ initialData, slug }) {
   const [categories, setCategories] = useState(initialData.categories);
   const [items, setItems] = useState(initialData.items);
   const [banners, setBanners] = useState(initialData.banners);
+  const [menuUnavailable, setMenuUnavailable] = useState(false);
+  const [refreshError, setRefreshError] = useState(false);
+  const [menuUrl, setMenuUrl] = useState('');
 
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,48 +36,64 @@ export default function CustomerMenuClient({ initialData, slug }) {
     Autoplay({ delay: 3500, stopOnInteraction: false }),
   ]);
 
-  // -- REALTIME PUBLIC MENU SYNC --
+  // Refetch through the public projection so category visibility and feature
+  // changes are enforced on live updates as well as the first server render.
   useEffect(() => {
     if (!cafe?.id) return;
-
-    const channel = supabase
-      .channel("public-menu-sync")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "MenuItem",
-          filter: `cafeId=eq.${cafe.id}`,
-        },
-        (payload) => {
-          setItems((currentItems) => {
-            if (payload.eventType === "UPDATE") {
-              return currentItems.map((item) =>
-                item.id === payload.new.id ? { ...item, ...payload.new } : item,
-              );
-            }
-            if (payload.eventType === "INSERT") {
-              if (currentItems.some((i) => i.id === payload.new.id))
-                return currentItems;
-              return [payload.new, ...currentItems];
-            }
-            if (payload.eventType === "DELETE") {
-              return currentItems.filter((item) => item.id !== payload.old.id);
-            }
-            return currentItems;
-          });
-        },
-      )
-      .subscribe();
-
+    let disposed = false;
+    let timer;
+    let revision = 0;
+    const refresh = async () => {
+      const currentRevision = ++revision;
+      try {
+        const data = await getPublicMenuBySlug(slug, mode);
+        if (disposed || currentRevision !== revision) return;
+        setRefreshError(false);
+        setMenuUnavailable(!data);
+        if (!data) return;
+        setCafe(data.cafe);
+        setFeatures(data.features);
+        setCategories(data.categories);
+        setItems(data.items);
+        setBanners(data.banners);
+        setActiveCategory(current => current === 'ALL' || data.categories.some(c => c.id === current) ? current : 'ALL');
+      } catch {
+        if (!disposed && currentRevision === revision) setRefreshError(true);
+      }
+    };
+    const scheduleRefresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(refresh, 150);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') scheduleRefresh();
+    };
+    let channel = supabase.channel(`public-menu:${cafe.id}:${mode}`);
+    for (const table of ['MenuItem', 'Category', 'CafeBanner', 'CafeFeatures']) {
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `cafeId=eq.${cafe.id}` }, scheduleRefresh);
+    }
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'Cafe', filter: `id=eq.${cafe.id}` }, scheduleRefresh)
+      .subscribe(status => { if (status === 'SUBSCRIBED') scheduleRefresh(); });
+    // Close the SSR/subscription gap even on browsers that cannot connect Realtime.
+    scheduleRefresh();
+    window.addEventListener('focus', scheduleRefresh);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
+      disposed = true;
+      clearTimeout(timer);
+      window.removeEventListener('focus', scheduleRefresh);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       supabase.removeChannel(channel);
     };
-  }, [cafe?.id]);
+  }, [cafe?.id, slug, mode]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMenuUrl(`${window.location.origin}/${encodeURIComponent(slug)}/catering`), 0);
+    return () => clearTimeout(timer);
+  }, [slug]);
 
   const handleCallWaiter = async () => {
-    if (!cafe?.id || !tableNumber) return;
+    if (isCatering || !cafe?.id || !tableNumber || !cafe.hasTableService || !features?.table_service?.enabled) return;
     setIsCalling(true);
     try {
       await createServiceRequest(cafe.id, tableNumber);
@@ -84,40 +106,25 @@ export default function CustomerMenuClient({ initialData, slug }) {
     }
   };
 
-  const filteredItems = items
-    .filter((item) => {
-      const matchesCategory =
-        activeCategory === "ALL" || item.categoryId === activeCategory;
-      const matchesSearch = item.name
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
-    })
-    .sort((a, b) => {
-      // 1. Sort by stock status first (in-stock top, out-of-stock bottom)
-      if (a.inStock !== b.inStock) {
-        return a.inStock ? -1 : 1;
-      }
-      
-      // 2. ENHANCEMENT: If both have same stock status and sort order, sort by oldest first
-      if (a.createdAt && b.createdAt) {
-        return new Date(a.createdAt) - new Date(b.createdAt);
-      }
-      
-      // Fallback if createdAt doesn't exist on your items
-      return a.id < b.id ? -1 : 1;
-    });
-
-  const showWaiterButton = features?.table_service?.enabled === true && tableNumber;
+  const filteredItems = selectMenuItems(items, categories, { mode, features, cafeId: cafe.id, activeCategory, searchQuery });
+  const showWaiterButton = !isCatering && cafe.hasTableService && features?.table_service?.enabled === true && tableNumber;
   const canUseBanners = features?.banners?.enabled === true;
+  let enquiryUrl = null;
+  if (isCatering && menuUrl) {
+    try { enquiryUrl = buildCateringEnquiryUrl(cafe.cateringWhatsappNumber, cafe.name, menuUrl); } catch { /* Invalid legacy contact: keep sharing available. */ }
+  }
+
+  if (menuUnavailable || (isCatering && !isCateringEnabled(features))) {
+    return <main className="min-h-screen bg-[#F6F7F9] p-8 text-center"><h1 className="mt-20 text-2xl font-bold">Menu unavailable</h1><p className="mt-4 text-base text-neutral-600">This menu is no longer available. Please contact the restaurant.</p></main>;
+  }
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] font-sans antialiased pb-32 relative">
       {/* --- NORMAL HEADER (No longer sticky) --- */}
       <header className="bg-[#1A1C19] pt-12 pb-6 px-6 relative  shadow-lg z-30">
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-amber-300 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="w-12 h-12 shrink-0 bg-gradient-to-br from-amber-300 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
               <svg
                 className="w-6 h-6 text-[#1A1C19]"
                 fill="none"
@@ -132,17 +139,17 @@ export default function CustomerMenuClient({ initialData, slug }) {
                 />
               </svg>
             </div>
-            <div>
-              <h1 className="text-[22px] font-extrabold tracking-tight text-white leading-none uppercase mb-1">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-[22px] break-words font-extrabold tracking-tight text-white leading-tight uppercase mb-1">
                 {cafe.name}
               </h1>
               <p className="text-[11px] font-bold text-amber-400 tracking-wider">
-                Malappuram
+                {isCatering ? 'Catering menu' : 'Malappuram'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="ml-3 flex shrink-0 items-center gap-3">
             {tableNumber && (
               <div className="bg-white/10 border border-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm">
                 <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
@@ -154,6 +161,8 @@ export default function CustomerMenuClient({ initialData, slug }) {
             {/* NEW: Search Toggle Icon Button */}
             <button
               onClick={() => setIsSearchOpen(!isSearchOpen)}
+              aria-label={isSearchOpen ? 'Close menu search' : 'Search menu'}
+              aria-expanded={isSearchOpen}
               className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors border border-white/10"
             >
               <svg
@@ -209,6 +218,7 @@ export default function CustomerMenuClient({ initialData, slug }) {
               <input
                 type="text"
                 placeholder="Search dishes, drinks..."
+                aria-label="Search dishes"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-white/10 border border-white/10 text-white placeholder-neutral-400 text-sm rounded-2xl py-3.5 pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
@@ -217,6 +227,21 @@ export default function CustomerMenuClient({ initialData, slug }) {
           )}
         </AnimatePresence>
       </header>
+
+      {isCatering && (
+        <section aria-labelledby="catering-intro-title" className="mx-auto max-w-[600px] px-4 pt-6 sm:px-6">
+          <div className="space-y-4 rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wide text-emerald-800">Made for your occasion</p>
+              <h2 id="catering-intro-title" className="mt-2 text-2xl font-bold text-[#111814]">Explore our catering menu</h2>
+              <p className="mt-3 text-base leading-relaxed text-neutral-600">Discover our dishes for family gatherings, celebrations, and events.</p>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-600">Contact us to confirm your event date, quantities, and final quotation.</p>
+            </div>
+            {menuUrl && <MenuShareActions name={cafe.name} url={menuUrl} showUrl={false} />}
+          </div>
+        </section>
+      )}
+      {refreshError && <p role="status" className="mx-auto max-w-[600px] px-6 pt-4 text-sm text-amber-800">Live updates are temporarily unavailable. Refresh to check the latest menu.</p>}
 
       {/* Banners (No longer sticky) */}
       {canUseBanners && banners.length > 0 && !searchQuery && (
@@ -305,6 +330,7 @@ export default function CustomerMenuClient({ initialData, slug }) {
 
         {filteredItems.map((item) => {
           const hasDesc = !!item.description?.trim();
+          const isUnavailable = !isCatering && !item.inStock;
 
           return (
             <motion.div
@@ -313,7 +339,7 @@ export default function CustomerMenuClient({ initialData, slug }) {
               animate={{ opacity: 1, y: 0 }}
               key={item.id}
               className={`bg-white p-3 rounded-[20px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border relative overflow-hidden transition-all ${
-                !item.inStock
+                isUnavailable
                   ? "border-neutral-200 bg-neutral-100/50 pointer-events-none"
                   : "border-neutral-100"
               }`}
@@ -322,7 +348,7 @@ export default function CustomerMenuClient({ initialData, slug }) {
                 className={`flex gap-4 ${hasDesc ? "items-start" : "items-center"}`}
               >
                 <div
-                  className={`bg-neutral-100 rounded-[14px] overflow-hidden flex-shrink-0 border border-neutral-100/50 ${hasDesc ? "w-20 h-20" : "w-16 h-16"} ${!item.inStock ? "grayscale opacity-40" : ""}`}
+                  className={`bg-neutral-100 rounded-[14px] overflow-hidden flex-shrink-0 border border-neutral-100/50 ${hasDesc ? "w-20 h-20" : "w-16 h-16"} ${isUnavailable ? "grayscale opacity-40" : ""}`}
                 >
                   <img
                     src={item.imageUrl}
@@ -332,14 +358,14 @@ export default function CustomerMenuClient({ initialData, slug }) {
                 </div>
 
                 <div
-                  className={`flex-1 min-w-0 flex flex-col justify-center py-0.5 ${!item.inStock ? "opacity-50" : ""}`}
+                  className={`flex-1 min-w-0 flex flex-col justify-center py-0.5 ${isUnavailable ? "opacity-50" : ""}`}
                 >
                   <div
                     className={`flex justify-between items-start gap-3 ${hasDesc ? "mb-1" : ""}`}
                   >
                     <div className="flex-1 min-w-0">
                       <h3
-                        className={`font-bold text-[#111814] leading-tight ${hasDesc ? "text-[15px]" : "text-[15px] truncate"}`}
+                        className={`font-bold text-[#111814] leading-tight ${isCatering ? "text-base break-words" : hasDesc ? "text-[15px]" : "text-[15px] truncate"}`}
                       >
                         {item.name}
                       </h3>
@@ -362,12 +388,12 @@ export default function CustomerMenuClient({ initialData, slug }) {
                   </div>
 
                   {hasDesc && (
-                    <p className="text-[11px] font-medium text-neutral-400 leading-relaxed pr-4 mb-2 whitespace-pre-wrap">
+                    <p className={`${isCatering ? 'text-sm text-neutral-600' : 'text-[11px] text-neutral-400'} font-medium leading-relaxed pr-4 mb-2 whitespace-pre-wrap`}>
                       {item.description}
                     </p>
                   )}
 
-                  {!item.inStock && (
+                  {isUnavailable && (
                     <div className={`${hasDesc ? "mt-auto" : "mt-1"}`}>
                       <span className="inline-block bg-red-600 text-white text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-sm shadow-sm">
                         Unavailable
@@ -380,6 +406,12 @@ export default function CustomerMenuClient({ initialData, slug }) {
           );
         })}
       </div>
+
+      {enquiryUrl && (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-100 bg-white/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+          <a href={enquiryUrl} target="_blank" rel="noopener noreferrer" className="mx-auto block max-w-[552px] rounded-2xl bg-[#176445] px-5 py-4 text-center text-base font-bold text-white hover:bg-[#115036]">Enquire about catering on WhatsApp</a>
+        </div>
+      )}
 
       {/* --- SMALL FLOATING ACTION BUTTON (Call Waiter) --- */}
       <AnimatePresence>
@@ -409,6 +441,7 @@ export default function CustomerMenuClient({ initialData, slug }) {
             ) : (
               <button
                 onClick={handleCallWaiter}
+                aria-label="Call waiter"
                 disabled={isCalling}
                 className="w-14 h-14 rounded-full bg-[#1A1C19] shadow-[0_15px_40px_rgba(0,0,0,0.3)] flex items-center justify-center hover:scale-[1.05] active:scale-95 transition-transform disabled:opacity-70 border border-white/10"
               >
