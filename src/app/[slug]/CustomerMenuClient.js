@@ -8,7 +8,6 @@ import { supabase } from "@/lib/supabase";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 import { selectMenuItems, isCateringEnabled, buildCateringEnquiryUrl } from '@/lib/menu.mjs';
-import MenuShareActions from '@/app/components/MenuShareActions';
 
 export default function CustomerMenuClient({ initialData, slug, mode = 'outlet' }) {
   const isCatering = mode === 'catering';
@@ -227,20 +226,6 @@ export default function CustomerMenuClient({ initialData, slug, mode = 'outlet' 
           )}
         </AnimatePresence>
       </header>
-
-      {isCatering && (
-        <section aria-labelledby="catering-intro-title" className="mx-auto max-w-[600px] px-4 pt-6 sm:px-6">
-          <div className="space-y-4 rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-wide text-emerald-800">Made for your occasion</p>
-              <h2 id="catering-intro-title" className="mt-2 text-2xl font-bold text-[#111814]">Explore our catering menu</h2>
-              <p className="mt-3 text-base leading-relaxed text-neutral-600">Discover our dishes for family gatherings, celebrations, and events.</p>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-600">Contact us to confirm your event date, quantities, and final quotation.</p>
-            </div>
-            {menuUrl && <MenuShareActions name={cafe.name} url={menuUrl} showUrl={false} />}
-          </div>
-        </section>
-      )}
       {refreshError && <p role="status" className="mx-auto max-w-[600px] px-6 pt-4 text-sm text-amber-800">Live updates are temporarily unavailable. Refresh to check the latest menu.</p>}
 
       {/* Banners (No longer sticky) */}
